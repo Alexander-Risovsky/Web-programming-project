@@ -212,3 +212,6 @@ __marimo__/
 data/.example_html/
 data/scratch/
 .~lock.*
+
+
+node_modules/
