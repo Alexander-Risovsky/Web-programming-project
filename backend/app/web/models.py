@@ -14,11 +14,19 @@ class Post(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = "Пост"
+        verbose_name_plural = "Посты"
+
 
 class Event(models.Model):
     post = models.OneToOneField(Post, on_delete=models.CASCADE, related_name="event")
     event_date = models.DateTimeField()
     location = models.CharField(max_length=255)
+
+    class Meta:
+        verbose_name = "Событие"
+        verbose_name_plural = "События"
 
 
 class RegistrationForm(models.Model):
