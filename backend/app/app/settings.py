@@ -43,7 +43,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     'drf_spectacular',
-    "users",
     "web",
 ]
 
@@ -95,7 +94,8 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
-AUTH_USER_MODEL = 'users.CustomUser'
+
+AUTH_USER_MODEL = "auth.User"
 
 AUTH_PASSWORD_VALIDATORS = [
     {
