@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     'drf_spectacular',
+    "users",
     "web",
 ]
 
@@ -95,7 +96,8 @@ DATABASES = {
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 
-AUTH_USER_MODEL = "auth.User"
+# Use custom user with avatar_url while keeping Django auth workflows.
+AUTH_USER_MODEL = "users.CustomUser"
 
 AUTH_PASSWORD_VALIDATORS = [
     {
