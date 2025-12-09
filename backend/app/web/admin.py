@@ -1,11 +1,7 @@
 from django.contrib import admin
-from web.models import Event, Post
+from web.models import Post
 # Register your models here.
 
-
-@admin.register(Event)
-class EventAdmin(admin.ModelAdmin):
-    pass
 
 
 @admin.register(Post)
