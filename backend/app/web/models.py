@@ -3,9 +3,11 @@ from django.db import models
 
 
 class Club(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="clubs")
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    avatar_url = models.ImageField(blank=True, null=True)
+    avatar_url = models.ImageField(upload_to="club_avatars/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
