@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
 from users.models import CustomUser, Student
+from web.models import Club
 
 
 @admin.register(CustomUser)
@@ -15,3 +16,9 @@ class CustomUserAdmin(UserAdmin):
 class StudentAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "major")
     search_fields = ("user__username", "major")
+
+
+@admin.register(Club)
+class ClubAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "description", "created_at")
+    search_fields = ("name",)
