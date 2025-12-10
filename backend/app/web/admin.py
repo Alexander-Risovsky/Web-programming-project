@@ -1,7 +1,6 @@
 from django.contrib import admin
 
 from web.models import (
-    Club,
     Form,
     Post,
     Registration,
@@ -11,12 +10,6 @@ from web.models import (
     RegistrationSubmission,
     Subscription,
 )
-
-
-@admin.register(Club)
-class ClubAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "description", "created_at")
-    search_fields = ("name",)
 
 
 @admin.register(Form)
