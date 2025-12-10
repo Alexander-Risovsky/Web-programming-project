@@ -1,6 +1,0 @@
-nox==2025.5.1
-django==5.2.7
-djangorestframework==3.16.1
-python-dotenv==0.9.9
-psycopg2==2.9.10
-drf_spectacular==0.28.0
