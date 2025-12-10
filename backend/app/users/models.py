@@ -4,7 +4,7 @@ from django.db import models
 
 class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
-    avatar_url = models.URLField(blank=True)
+    avatar_url = models.ImageField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -18,8 +18,10 @@ class CustomUser(AbstractUser):
 
 class Student(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="student_profile")
-    name = models.CharField(max_length=150, null=True)
-    surname = models.CharField(max_length=150, null=True)
+    name = models.CharField(max_length=150, null=True, blank=True)
+    surname = models.CharField(max_length=150, null=True, blank=True)
+    course = models.CharField(max_length=10, null=True, blank=True)
+    group = models.CharField(max_length=100, null=True, blank=True)
     major = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
