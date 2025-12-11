@@ -1,55 +1,75 @@
-// src/data/mockData.js
 export const organizations = [
-  { id: 1, name: "Турклуб" },
-  { id: 2, name: "СтудАктив" },
-  { id: 3, name: "ССК" },
-  { id: 4, name: "СтрайкболКлуб" },
-  { id: 5, name: "SNOW MOVE" },
-  { id: 6, name: "hse crew" },
-  { id: 7, name: "HSE INVEST CLUB PERM" },
-  { id: 8, name: "HSE URSUS" },
+  { id: 1, name: "Турклуб", logo: "TK logo.jpg" },
+  { id: 2, name: "СтудАктив", logo: "studAct Logo.jpg" },
+  { id: 3, name: "ССК", logo: "SSK Logo.jpg" },
+  { id: 4, name: "Strike Club", logo: "StrikeClubMeeting.jpg" },
+  { id: 5, name: "SNOW MOVE", logo: "snowmove.jpg" },
+  { id: 6, name: "HSE Crew", logo: "hsecrew.jpg" },
+  { id: 7, name: "HSE Invest Club Perm", logo: "investclub.jpg" },
+  { id: 8, name: "HSE Ursus", logo: "ursus logo.jpg" },
+  { id: 9, name: "ARTЭРИЯ HSE", logo: "arteria logo.jpg" },
+  { id: 10, name: "Большой Эд", logo: "big ed logo.jpg" },
 ];
 
 export const posts = [
   {
     id: 1,
     orgId: 1,
-    title: "Новый поход в горы!",
+    type: "info",
+    title: "Запуск творческого фестиваля",
     content:
-      "Друзья, приглашаем всех желающих на треккинг по Уралу в эти выходные!",
+      "Ищем ребят в медиа, сцену и логистику. Подготовка к городскому фестивалю, нужны волонтёры на разные роли.",
     date: "2025-11-10",
     image: "/OrganizationLogo/TK logo.jpg",
   },
   {
     id: 2,
     orgId: 1,
-    title: "Собрание турклуба",
-    content: "Обсудим планы на зимний сезон, новые маршруты и оборудование.",
-    date: "2025-10-30",
+    type: "event",
+    title: "Мастер-класс по съемке",
+    content:
+      "Базовые техники фото и видео. Приносите смартфоны или камеры, разберёмся с настройками и практикой.",
+    date: "2025-11-05",
+    image: "/OrganizationLogo/TK logo.jpg",
   },
   {
     id: 3,
     orgId: 2,
-    title: "Собрание студактива",
-    content: "Присоединяйтесь к нашей команде для организации мероприятий!",
-    date: "2025-11-05",
+    type: "info",
+    title: "СтудАктив: встреча новичков",
+    content:
+      "Расскажем о направлениях, проектах и ролях. Формат — открытый диалог, будет чай и печеньки.",
+    date: "2025-11-03",
     image: "/OrganizationLogo/studAct Logo.jpg",
   },
   {
     id: 4,
-    orgId: 3,
-    title: "Спортивные выходные!",
+    orgId: 4,
+    type: "event",
+    title: "Strike Club: открытая тренировка",
     content:
-      "ССК приглашает всех студентов принять участие в футбольном турнире!",
+      "Присоединяйтесь к круговым тренировкам. Разминка, работа в парах и знакомство с командой.",
     date: "2025-11-02",
+    image: "/OrganizationLogo/StrikeClubMeeting.jpg",
   },
   {
     id: 5,
     orgId: 5,
-    title: "SNOW MOVE открыл сезон!",
+    type: "event",
+    title: "SNOW MOVE: сбор на первый выезд",
     content:
-      "Катание, музыка, эмоции — всё это ждало участников нашего открытия сезона.",
+      "Презентация сезона, расписание поездок и запись в группы. Приходите познакомиться и задать вопросы.",
     date: "2025-11-01",
     image: "/OrganizationLogo/snowmove.jpg",
+  },
+  {
+    id: 6,
+    orgId: 6,
+    type: "info",
+    title: "HSE Crew ищет новых участников",
+    content:
+      "Команда расширяется: нужны ребята в организацию, PR и дизайн. Пишите, если хотите прокачаться на проектах.",
+    date: "2025-10-28",
+    image: "/OrganizationLogo/hsecrew.jpg",
   },
 ];
