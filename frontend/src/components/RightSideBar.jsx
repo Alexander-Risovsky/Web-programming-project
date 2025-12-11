@@ -1,75 +1,49 @@
-import React, { useState } from "react";
+import React from "react";
+import { organizations as orgData } from "../data/mockOrgsAndPosts";
+import { useAuth } from "../context/AuthContext";
 
-export default function RightSidebar({ currentPath }) {
-  // Состояние для подписок
-  const [followed, setFollowed] = useState([]);
-  const [organizations, setOrganizations] = useState([
-    { id: 1, name: "Большой ЭД", logo: "/OrganizationLogo/big ed logo.jpg" },
-    { id: 2, name: "ARTЭрия", logo: "/OrganizationLogo/arteria logo.jpg" },
-    { id: 3, name: "Автоклуб", logo: "/OrganizationLogo/autoclub logo.jpg" },
-    {
-      id: 4,
-      name: "Клуб Интеллектуальных Игр",
-      logo: "/OrganizationLogo/intelect igri logo.jpg",
-    },
-  ]);
+const events = [
+  {
+    id: 1,
+    title: "Тренировочный матч ЛФК-турнира",
+    org: "Strike Club",
+    date: "30 октября 2025",
+    time: "18:00",
+    img: "/OrganizationLogo/StrikeClubMeeting.jpg",
+  },
+  {
+    id: 2,
+    title: "HSE Face",
+    org: "HSE Crew",
+    date: "28 декабря 2026",
+    time: "18:30",
+    img: "/OrganizationLogo/hseface logo.jpg",
+  },
+];
 
-  const events = [
-    {
-      id: 1,
-      title: "Выезд постреляться)",
-      org: "СтрайкболКлуб",
-      date: "30 сентября, 2025",
-      time: "18:00",
-      img: "../public/OrganizationLogo/StrikeClubMeeting.jpg",
-    },
-    {
-      id: 2,
-      title: "HSE FACE",
-      org: "СтудАктив",
-      date: "28 апреля 2026",
-      time: "18:30",
-      img: "../public/OrganizationLogo/hseface logo.jpg",
-    },
-  ];
-
-  // const handleFollow = (org) => {
-  //   // setFollowed([...followed, org]);
-  //   // setOrganizations(organizations.filter((o) => o.id !== org.id));
-  // };
+export default function RightSidebar() {
+  const { user } = useAuth();
+  const isOrg = user?.role === "org";
+  const recommendations = orgData.slice(0, 4);
 
   return (
-    <aside className="w-72 bg-slate-50 border-l border-slate-200 p-5 pt-3 flex flex-col gap-6">
-      {/* Верхний блок с иконками Уведосления и Настройки */}
-      <div className="flex justify-end gap-3 border-b pb-3">
-        <button className="w-10 h-10 rounded-full hover:bg-slate-200 transition-colors duration-300">
-          <img src="../public/NotificationIcon.svg" alt="Уведомления" />
-        </button>
-        <button className="w-10 h-10 rounded-full hover:bg-slate-200 transition-colors duration-300">
-          <img src="../public/SettingsIcon.svg" alt="Настройки" />
-        </button>
-      </div>
-
-      {/* Ближайшие мероприятия */}
-      <div>
-        <h3 className="font-semibold mb-3">Ближайшие мероприятия</h3>
+    <aside className="h-full space-y-5">
+      <div className="p-4 glass-card">
+        <h3 className="mb-3 font-semibold text-slate-800">
+          {isOrg ? "Ближайшие мероприятия организации" : "Ближайшие мероприятия"}
+        </h3>
         <div className="flex flex-col gap-3">
-          {events.map((event) => (
+          {events.map((event, idx) => (
             <div
               key={event.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+              className="overflow-hidden border shadow-sm bg-white/90 rounded-xl border-slate-200 animate-slide-up"
+              style={{ animationDelay: `${idx * 80}ms` }}
             >
-              <img
-                src={event.img}
-                alt={event.title}
-                className="w-full h-28 object-cover"
-              />
+              <img src={event.img} alt={event.title} className="object-cover w-full h-28" />
               <div className="p-3">
-                <h4 className="font-semibold text-slate-800 text-sm">
-                  {event.title}
-                </h4>
+                <h4 className="text-sm font-semibold text-slate-800">{event.title}</h4>
                 <p className="text-xs text-slate-500">{event.org}</p>
-                <p className="text-xs text-slate-600 mt-1">
+                <p className="mt-1 text-xs text-slate-600">
                   {event.date}, {event.time}
                 </p>
               </div>
@@ -78,55 +52,34 @@ export default function RightSidebar({ currentPath }) {
         </div>
       </div>
 
-      {/* Возможно интересно */}
-      <div>
-        <h3 className="font-semibold mb-3">Возможно интересно</h3>
+      <div className="p-4 glass-card">
+        <h3 className="mb-3 font-semibold text-slate-800">Другие организации</h3>
         <div className="flex flex-col gap-2">
-          {organizations.length > 0 ? (
-            organizations.map((org) => (
-              <div
-                key={org.id}
-                className="flex items-center justify-between bg-white border border-slate-200 rounded-full px-2 py-2 shadow-sm hover:shadow-md transition-all duration-300"
-              >
-                <div className="flex items-center gap-2 justify-between w-full">
-                  <div className="flex items-center justify-start gap-2">
-                    <img
-                      src={org.logo}
-                      alt={org.name}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = "/OrganizationLogo/DefaultLogo.jpg";
-                      }}
-                      className="w-7 h-7 rounded-full object-cover"
-                    />
-                    <span
-                      className="text-sm font-medium text-slate-800 truncate max-w-[200px]"
-                      title={org.name}
-                    >
-                      {org.name}
-                    </span>
-                  </div>
-
-                  <button className="p-1.5 items-center rounded-full hover:bg-slate-100 transition-all duration-300">
-                    <img
-                      src="../public/FollowOrg.svg"
-                      alt="Отслеживать организацию"
-                    />
-                  </button>
-                </div>
-                {/* <button
-                  onClick={() => handleFollow(org)}
-                  className="w-7 h-7 rounded-full bg-primary text-white font-bold hover:bg-primaryHover transition-all duration-300 flex items-center justify-center"
-                >
-                  +
-                </button> */}
+          {recommendations.map((org, idx) => (
+            <div
+              key={org.id}
+              className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm hover:shadow-md transition-all duration-300 animate-slide-up"
+              style={{ animationDelay: `${idx * 70}ms` }}
+            >
+              <div className="flex items-center gap-3">
+                <img
+                  src={`/OrganizationLogo/${org.logo || "DefaultLogo.jpg"}`}
+                  alt={org.name}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "/OrganizationLogo/DefaultLogo.jpg";
+                  }}
+                  className="object-cover rounded-full w-9 h-9"
+                />
+                <span className="text-sm font-medium text-slate-800">{org.name}</span>
               </div>
-            ))
-          ) : (
-            <p className="text-sm text-slate-500">
-              Вы подписаны на все организации!
-            </p>
-          )}
+              <button className="flex items-center justify-center w-8 h-8 transition-all duration-300 border shadow-sm rounded-xl border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white hover:shadow-md">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </aside>

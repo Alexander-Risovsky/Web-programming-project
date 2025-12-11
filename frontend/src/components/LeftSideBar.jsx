@@ -1,165 +1,259 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { organizations } from "../data/mockOrgsAndPosts";
+import { useAuth } from "../context/AuthContext";
 
-export default function LeftSidebar({ currentPath }) {
-  const followedOrganizations = [
-    { id: 1, name: "Турклуб", logo: "../public/OrganizationLogo/TK logo.jpg" },
-    {
-      id: 2,
-      name: "СтудАктив",
-      logo: "../public/OrganizationLogo/studAct Logo.jpg",
-    },
-    { id: 3, name: "ССК", logo: "../public/OrganizationLogo/SSK Logo.jpg" },
-    {
-      id: 4,
-      name: "СтрайкболКлуб",
-      logo: "../public/OrganizationLogo/StrikeClubMeeting.jpg",
-    },
-    {
-      id: 5,
-      name: "SNOW MOVE",
-      logo: "../public/OrganizationLogo/snowmove.jpg",
-    },
-    {
-      id: 6,
-      name: "hse crew",
-      logo: "../public/OrganizationLogo/hsecrew.jpg",
-    },
-    {
-      id: 7,
-      name: "HSE INVEST CLUB PERM",
-      logo: "../public/OrganizationLogo/investclub.jpg",
-    },
-    {
-      id: 8,
-      name: "HSE URSUS",
-      logo: "../public/OrganizationLogo/ursus logo.jpg",
-    },
-  ];
-  const userData = {
-    name: "Богдан",
-    surname: "Заозёров",
-    email: "bazaozerov@edu.hse.ru",
-    phone: "+7 (904) 847-05-84",
-    studyGroup: "РИС-23-1",
-    role: "Студент",
+export default function LeftSidebar({
+  currentPath,
+  mobileMenuOpen,
+  setMobileMenuOpen,
+}) {
+  const location = useLocation();
+  const { user, isOrg } = useAuth();
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      setMobileMenuOpen(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const handleLinkClick = () => {
+    if (setMobileMenuOpen) {
+      setMobileMenuOpen(false);
+    }
   };
 
-  const location = useLocation();
+  const sections = [{ id: "home", name: "Главная", to: "/" }];
 
-  const isOrgPage = currentPath.startsWith("/organization");
+  // Подписки текущего студента
+  const followedOrgIds = [1, 2, 4, 5, 6];
+  const followedOrgs = organizations.filter((o) =>
+    followedOrgIds.includes(o.id)
+  );
 
-  const isActive = location.pathname === `/`;
+
+  const getIcon = (id, active) => {
+    const cls = `w-7 h-7 ${
+      active ? "text-white" : "text-slate-600 group-hover:text-primary"
+    }`;
+    switch (id) {
+      case "home":
+        return (
+          <svg
+            className={cls}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 9.75L12 4l9 5.75V20a1 1 0 01-1 1h-5.5a.5.5 0 01-.5-.5V15a2 2 0 00-4 0v5.5a.5.5 0 01-.5.5H4a1 1 0 01-1-1V9.75z"
+            />
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
-    <aside className="flex flex-col justify-between w-64 p-4 border-r bg-slate-50 border-slate-200">
-      <div>
-        {/* Лого */}
-        <Link to="/">
-          <div className="flex items-center pb-4 mb-6 space-x-3 border-b">
-            <img src="../public/Logo.svg" alt="Логотип" className="w-8 h-8" />
-            <div className="text-xl italic font-black text-slate-800 font-jakarta">
+    <aside
+      className={`
+        fixed left-0 top-0 h-screen w-64 bg-white/95 backdrop-blur-sm border-r-2 border-slate-200 shadow-xl z-50
+        flex flex-col transition-transform duration-300 ease-in-out
+        lg:fixed lg:h-screen lg:translate-x-0 lg:z-auto
+        ${
+          mobileMenuOpen
+            ? "translate-x-0"
+            : "-translate-x-full lg:translate-x-0"
+        }
+      `}
+    >
+      <div className="absolute top-0 left-0 w-full h-32 pointer-events-none bg-gradient-to-b from-primary/5 to-transparent" />
+
+      <div className="flex-1 p-4 overflow-y-auto lg:p-6">
+        <Link
+          to="/welcome"
+          onClick={handleLinkClick}
+          className="relative z-10 block group"
+        >
+          <div className="flex items-center px-1 py-1 pb-2 mb-4 space-x-3 rounded-lg border-slate-200">
+            <div className="relative">
+              <img
+                src="/Logo.svg"
+                alt="Логотип"
+                className="relative z-10 w-10 h-10 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6"
+              />
+              <div className="absolute inset-0 transition-opacity duration-300 rounded-full opacity-0 bg-primary/20 blur-md group-hover:opacity-100" />
+            </div>
+            <div className="text-lg font-black text-transparent transition-all duration-300 lg:text-xl bg-gradient-to-r from-slate-800 via-primary to-purple-600 bg-clip-text group-hover:scale-105">
               HSE Flow
             </div>
           </div>
         </Link>
 
-        <nav className="flex flex-col gap-2">
-          <NavLink
-            to="/"
-            className={`flex items-center mt-2 justify-between   rounded-full px-3 py-2 shadow-sm hover:shadow-md transition-all duration-300 ${
-              isActive
-                ? "bg-secondary border border-primaryHover"
-                : "bg-white border border-slate-200"
-            }`}
-          >
-            <div className="flex items-center">
-              <img
-                src="../public/HomeIcon.svg"
-                alt="Иконка Главной страницы"
-                className="object-cover mr-3 w-7 h-7"
-              />
-              <span className="font-medium">Главная</span>
-            </div>
-          </NavLink>
-          {/* <NavLink to="/search" className="hover:text-blue-600 font-jakarta">
-            Поиск
-          </NavLink>
-          <NavLink to="/profile" className="hover:text-blue-600">
-            Профиль
-          </NavLink> */}
-        </nav>
-
         <div className="mt-3">
-          <h3 className="mb-3 font-semibold">Список организаций</h3>
-          <ul className="space-y-1 text-600 ">
-            {followedOrganizations.map((org) => {
-              const isActive = location.pathname === `/organization/${org.id}`;
-              console.log(isActive);
-
+          <h3 className="mb-2 text-sm font-semibold tracking-wider uppercase text-slate-600">
+            Меню
+          </h3>
+          <ul className="space-y-2">
+            {sections.map((section, index) => {
+              const isActive = location.pathname === section.to;
               return (
-                <li key={org.id}>
+                <li
+                  key={section.id}
+                  className="animate-fade-in"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
                   <NavLink
-                    to={`/organization/${org.id}`}
-                    // className={`text-md items-center font-medium px-2 py-2 rounded-full block mt-2 ${
-                    //   isActive ? "bg-secondary" : "bg-slate-100"
-                    // }`}
-                    className={`flex items-center mt-2 justify-between font-medium rounded-full px-2 py-2 shadow-sm hover:shadow-md transition-all duration-300 ${
-                      isActive
-                        ? "bg-secondary border border-primaryHover"
-                        : "bg-white border border-slate-200"
-                    }`}
+                    to={section.to}
+                    onClick={handleLinkClick}
+                    className={`
+                      flex items-center px-2 lg:px-3 py-1.5 lg:py-2 text-sm lg:text-base font-medium rounded-xl
+                      transition-all duration-300 ease-in-out group relative overflow-hidden
+                      ${
+                        isActive
+                          ? "bg-gradient-to-r from-primary via-purple-600 to-indigo-600 text-white shadow-md shadow-primary/30 scale-105 font-semibold"
+                          : "bg-white text-slate-700 border-2 border-slate-200 hover:border-primary/50 hover:bg-slate-50 hover:shadow-md hover:scale-[1.02]"
+                      }
+                    `}
                   >
-                    <div className="flex items-center justify-start">
-                      <img
-                        src={
-                          org.logo ||
-                          "../public/OrganizationLogo/DefaultLogo.jpg"
+                    <div
+                      className={`
+                        flex items-center justify-center mr-3 rounded-lg p-0 relative transition-all duration-300
+                        ${
+                          isActive
+                            ? "bg-white/20 shadow-lg"
+                            : "bg-slate-100 group-hover:bg-gradient-to-br group-hover:from-primary/10 group-hover:to-purple-500/10"
                         }
-                        alt="Логотип организации"
-                        // onError={(e) => {
-                        //   e.target.onerror = null;
-                        //   e.target.src = "OrganizationLogo/DefaultLogo.jpg";
-                        // }}
-                        className="object-cover mr-3 rounded-full w-7 h-7"
+                      `}
+                    >
+                      <div
+                        className={`absolute inset-0 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm ${
+                          isActive ? "opacity-100" : ""
+                        }`}
                       />
-                      {org.name}
+                      <div
+                        className={`transition-all duration-300 relative z-10 ${
+                          isActive
+                            ? "scale-110"
+                            : "group-hover:scale-110 group-hover:rotate-3"
+                        }`}
+                      >
+                        {getIcon(section.id, isActive)}
+                      </div>
                     </div>
+                    <span className="flex-1 transition-all duration-300">
+                      {section.name}
+                    </span>
                   </NavLink>
                 </li>
               );
             })}
           </ul>
         </div>
+
+        {!isOrg && (
+          <div className="mt-6">
+            <h3 className="mb-2 text-sm font-semibold tracking-wider uppercase text-slate-600">
+              Подписки
+            </h3>
+            <ul className="space-y-2">
+              {followedOrgs.map((org, index) => {
+                const to = `/organization/${org.id}`;
+                const isActive = location.pathname === to;
+                return (
+                  <li
+                    key={org.id}
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <NavLink
+                      to={to}
+                      onClick={handleLinkClick}
+                      className={`
+                        flex items-center px-2 lg:px-3 py-1.5 lg:py-2 text-sm lg:text-base font-medium rounded-xl
+                        transition-all duration-300 ease-in-out group relative overflow-hidden
+                        ${
+                          isActive
+                            ? "bg-gradient-to-r from-primary via-purple-600 to-indigo-600 text-white shadow-md shadow-primary/30 scale-105 font-semibold"
+                            : "bg-white text-slate-700 border-2 border-slate-200 hover:border-primary/50 hover:bg-slate-50 hover:shadow-md hover:scale-[1.02]"
+                        }
+                      `}
+                    >
+                      <div
+                        className={`
+                          flex items-center justify-center mr-3 rounded-lg p-0 relative transition-all duration-300
+                          ${
+                            isActive
+                              ? "bg-white/20 shadow-lg"
+                              : "bg-slate-100 group-hover:bg-gradient-to-br group-hover:from-primary/10 group-hover:to-purple-500/10"
+                          }
+                        `}
+                      >
+                        <div
+                          className={`absolute inset-0 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm ${
+                            isActive ? "opacity-100" : ""
+                          }`}
+                        />
+                        <img
+                          src={`/OrganizationLogo/${org.logo || "DefaultLogo.jpg"}`}
+                          alt={org.name}
+                          className="relative z-10 object-cover rounded-md w-7 h-7"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = "/OrganizationLogo/DefaultLogo.jpg";
+                          }}
+                        />
+                      </div>
+                      <span className="flex-1 truncate transition-all duration-300">
+                        {org.name}
+                      </span>
+                    </NavLink>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </div>
 
-      <div className="flex items-center justify-between pt-3 mt-6 border-t">
-        <div className="flex items-center">
-          {/* Фото профиля */}
-          <NavLink to="/profile" className="">
-            <img
-              src="../public/ProfilePhoto.jpg"
-              alt="Фото профиля"
-              className="object-cover w-10 h-10 mr-3 rounded-full"
-            />
-          </NavLink>
-
-          {/* Имя, фамилия, группа студента */}
-          <div className="flex flex-col ">
-            <span className="text-sm font-medium">
-              {userData.name} {userData.surname}
-            </span>
-            <span className="text-sm text-slate-700">{userData.role}</span>
+      <div className="flex-shrink-0 p-3 pt-3 border-t-2 lg:p-5 border-slate-200 bg-white/95 backdrop-blur-sm">
+        <NavLink
+          to="/profile"
+          onClick={handleLinkClick}
+          className="flex items-center p-2.5 transition-all duration-300 border-2 border-transparent rounded-xl bg-slate-50 group animate-scale-in hover:border-primary/40 hover:shadow-md hover:scale-[1.01]"
+        >
+          <div className="relative flex-shrink-0">
+            <div className="flex items-center justify-center transition-all duration-300 rounded-full w-11 h-11 ring-2 ring-slate-200 group-hover:ring-primary/50 group-hover:scale-105 bg-gradient-to-br from-primary to-purple-600">
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+            </div>
+            {/* <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" /> */}
           </div>
-        </div>
 
-        {/* Выход из аккаунта */}
-        <NavLink to="/login" className="">
-          <img
-            src="../public/LogoutIcon.svg"
-            alt="Выход из аккаунта"
-            className="object-cover w-10 h-10"
-          />
+          <div className="flex flex-col flex-1 min-w-0 ml-2">
+            <span className="text-sm font-semibold leading-tight truncate transition-colors duration-300 text-slate-800 group-hover:text-primary">
+              {user.username}
+            </span>
+            <span className="text-xs leading-tight truncate text-slate-500">
+              {user.role}
+            </span>
+          </div>
         </NavLink>
       </div>
     </aside>

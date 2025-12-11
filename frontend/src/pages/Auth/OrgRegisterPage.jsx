@@ -1,13 +1,11 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-export default function RegisterPage() {
+export default function OrgRegisterPage() {
   const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    group: "",
-    email: "",
-    password: "",
+    orgName: "",
+    orgLogin: "",
+    orgPassword: "",
   });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -54,7 +52,7 @@ export default function RegisterPage() {
           -
         </span>
         <span className="text-sm font-medium text-center sm:text-lg text-slate-600 sm:text-left">
-          Студенческие мероприятия и организации университета
+          Регистрация организации
         </span>
       </header>
 
@@ -66,10 +64,10 @@ export default function RegisterPage() {
           <div className="relative z-10">
             <div className="mb-6 text-center sm:mb-8">
               <h1 className="mb-2 text-2xl font-bold text-transparent sm:text-3xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 bg-clip-text">
-                Регистрация
+                Регистрация организации
               </h1>
               <p className="text-xs sm:text-sm text-slate-600">
-                Создайте аккаунт
+                Укажите данные вашей организации для доступа в систему
               </p>
             </div>
 
@@ -77,72 +75,15 @@ export default function RegisterPage() {
               onSubmit={handleSubmit}
               className="flex flex-col space-y-4 sm:space-y-5"
             >
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">
-                    Имя
-                  </label>
-                  <input
-                    type="text"
-                    value={form.firstName}
-                    onChange={handleChange("firstName")}
-                    placeholder="Имя"
-                    className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">
-                    Фамилия
-                  </label>
-                  <input
-                    type="text"
-                    value={form.lastName}
-                    onChange={handleChange("lastName")}
-                    placeholder="Фамилия"
-                    className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">
-                    Группа
-                  </label>
-                  <input
-                    type="text"
-                    value={form.group}
-                    onChange={handleChange("group")}
-                    placeholder="Напр.: ПИ-23-1"
-                    className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">
-                    Курс
-                  </label>
-                  <input
-                    type="text"
-                    value={form.lastName}
-                    onChange={handleChange("lastName")}
-                    placeholder="Например: 3"
-                    className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                    required
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-slate-700">
-                  E-mail
+                  Название организации
                 </label>
-
                 <input
-                  type="email"
-                  value={form.email}
-                  onChange={handleChange("email")}
-                  placeholder="Введите e-mail"
+                  type="text"
+                  value={form.orgName}
+                  onChange={handleChange("orgName")}
+                  placeholder="Название"
                   className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
                   required
                 />
@@ -150,13 +91,28 @@ export default function RegisterPage() {
 
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-slate-700">
-                  Пароль
+                  Логин организации
+                </label>
+
+                <input
+                  type="text"
+                  value={form.orgLogin}
+                  onChange={handleChange("orgLogin")}
+                  placeholder="Придумайте логин"
+                  className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  Пароль организации
                 </label>
                 <input
                   type="password"
-                  value={form.password}
-                  onChange={handleChange("password")}
-                  placeholder="Введите пароль"
+                  value={form.orgPassword}
+                  onChange={handleChange("orgPassword")}
+                  placeholder="Придумайте пароль"
                   className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
                   required
                 />
@@ -167,9 +123,11 @@ export default function RegisterPage() {
                 disabled={loading}
                 className="relative w-full py-3.5 sm:py-4 bg-gradient-to-r from-primary via-purple-600 to-indigo-600 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden group"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 translate-x-[-100%] opacity-0 group-hover:translate-x-[100%] group-hover:opacity-100 transition-all duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 translate-x-[-120%] opacity-0 group-hover:translate-x-[120%] group-hover:opacity-100 transition-all duration-700 will-change-transform" />
                 <span className="relative z-10">
-                  {loading ? "Создаем аккаунт..." : "Зарегистрироваться"}
+                  {loading
+                    ? "Создаем аккаунт..."
+                    : "Зарегистрировать организацию"}
                 </span>
               </button>
             </form>
@@ -177,18 +135,18 @@ export default function RegisterPage() {
             <p className="mt-4 text-sm text-center text-slate-600">
               Уже есть аккаунт?{" "}
               <Link
-                to="/login"
+                to="/org/login"
                 className="font-semibold text-primary hover:underline"
               >
-                Войти
+                Войти как организация
               </Link>
             </p>
             <p className="mt-2 text-xs text-center text-slate-400">
               <Link
-                to="/org/register"
+                to="/register"
                 className="transition-colors hover:text-primary"
               >
-                Регистрация организации
+                Регистрация пользователя
               </Link>
             </p>
           </div>
