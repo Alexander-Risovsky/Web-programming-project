@@ -1,4 +1,4 @@
-name: Sync master -> amvira/master
+name: Sync master -> amvera/master
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   sync:
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true   
     runs-on: ubuntu-latest
 
     steps:
@@ -22,14 +22,14 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-      - name: Add amvira remote
+      - name: Add amvera remote
         run: |
-          git remote add amvira https://github.com/Alexander-Risovsky/amvira.git
-          git fetch amvira
+          git remote add amvera https://git.msk0.amvera.ru/krutoisashka/hseflowweb
+          git fetch amvera
 
-      - name: Push master -> amvira/master
+      - name: Push master -> amvera/master
         env:
-          GITHUB_TOKEN: ${{ secrets.AMVIRA_TOKEN }}
+          AMVERA_TOKEN: ${{ secrets.AMVERA_TOKEN }}
         run: |
           git checkout master
-          git push https://x-access-token:${GITHUB_TOKEN}@github.com/Alexander-Risovsky/amvira.git master --force
+          git push https://x-access-token:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflowweb master --force
