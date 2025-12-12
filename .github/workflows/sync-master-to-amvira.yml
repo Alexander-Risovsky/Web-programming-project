@@ -13,23 +13,26 @@ jobs:
 
     steps:
       - name: Checkout source repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Configure Git
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-      - name: Add amvera remote
+      - name: Add amvera remote (with token)
+        env:
+          AMVERA_SECRET: ${{ secrets.AMVIRA_SECRET }}
         run: |
-          git remote add amvera https://git.msk0.amvera.ru/krutoisashka/hseflowweb
+          git remote add amvera https://x-access-token:${AMVIRA_SECRET}@git.msk0.amvera.ru/krutoisashka/hseflowweb
           git fetch amvera
 
       - name: Push master -> amvera/master
         env:
-          AMVERA_TOKEN: ${{ secrets.AMVERA_TOKEN }}
+          AMVERA_TOKEN: ${{ secrets.AMVIRA_SECRET }}
         run: |
           git checkout master
-          git push https://x-access-token:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflowweb master --force
+          git push amvera master:master --force-with-lease
