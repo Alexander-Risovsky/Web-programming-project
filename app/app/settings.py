@@ -30,9 +30,24 @@ SECRET_KEY = "django-insecure-98_lk+4f9g$yv*(n38_yis31@1t1u1!f_gum3z%qv*-w=3t!mc
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['backend','localhost', 'hseflow-krutoisashka.amvera.io', 'amvera-krutoisashka-cnpg-pgwebhse-rw']
+ALLOWED_HOSTS = [
+    'backend',
+    'localhost',
+    'hseflow-krutoisashka.amvera.io',
+    'hseflowweb-krutoisashka.amvera.io',
+    'amvera-krutoisashka-cnpg-pgwebhse-rw',
+]
 
+# CORS/CSRF settings
+# Allow explicit frontend host; allow-all as a fallback to avoid missing origins in prod.
+CORS_ALLOWED_ORIGINS = [
+    'https://hseflowweb-krutoisashka.amvera.io',
+]
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [
+    'https://hseflowweb-krutoisashka.amvera.io',
+]
 
 # Application definition
 
@@ -43,6 +58,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     'drf_spectacular',
     "users",
@@ -51,6 +67,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # must be high to add CORS headers
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
