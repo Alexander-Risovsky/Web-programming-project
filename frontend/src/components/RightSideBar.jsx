@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-
+import {API_BASE_URL} from "../config"
 const events = [
   {
     id: 1,
@@ -32,7 +32,7 @@ export default function RightSidebar() {
   useEffect(() => {
     const loadClubs = async () => {
       try {
-        const res = await fetch("/api/clubs/");
+        const res = await fetch(`${API_BASE_URL}/api/clubs/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         setClubs(Array.isArray(data) ? data : []);
@@ -50,7 +50,7 @@ export default function RightSidebar() {
         return;
       }
       try {
-        const res = await fetch("/api/subscriptions/");
+        const res = await fetch(`${API_BASE_URL}/api/subscriptions/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         const subs = Array.isArray(data)
@@ -79,7 +79,7 @@ export default function RightSidebar() {
     if (!isStudent || !user?.id || loadingSub) return;
     setLoadingSub(true);
     try {
-      const res = await fetch("/api/subscriptions/", {
+      const res = await fetch(`${API_BASE_URL}/api/subscriptions/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: user.id, club: clubId }),

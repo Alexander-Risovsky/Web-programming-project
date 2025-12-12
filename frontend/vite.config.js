@@ -1,12 +1,20 @@
 import { defineConfig } from "vite";
 
-// Настройка прокси, чтобы обходить CORS в dev-режиме.
 export default defineConfig({
   server: {
+    host: "0.0.0.0",
+    port: 80, 
+    strictPort: true,
     proxy: {
-      "/api": {
-        target: "http://localhost:8000",
+      "/api": { 
+        target: "https:hseflow-krutoisashka.amvera.io",
         changeOrigin: true,
+        secure: true,
+      },
+      "/media": { 
+        target: "https:hseflow-krutoisashka.amvera.io",
+        changeOrigin: true,
+        secure: true,
       },
     },
   },

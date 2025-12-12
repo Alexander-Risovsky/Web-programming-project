@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import {API_BASE_URL} from "../../config"
 
 export default function OrgRegisterPage() {
   const [form, setForm] = useState({
@@ -29,7 +30,7 @@ export default function OrgRegisterPage() {
         description: form.description.trim(),
       };
 
-      const res = await fetch("/api/auth/register-club/", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register-club/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

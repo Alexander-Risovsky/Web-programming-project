@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { posts, organizations } from "../data/mockOrgsAndPosts";
-
+import {API_BASE_URL} from "../config"
 export default function ProfilePage() {
   const { user } = useAuth();
   const isOrg = user?.role === "org" || (!!user?.orgId && !user?.studentProfile);
@@ -34,7 +34,7 @@ export default function ProfilePage() {
       const clubId = user?.orgId || user?.id;
       if (!clubId) return;
       try {
-        const res = await fetch(`/api/clubs/${clubId}/`);
+        const res = await fetch(`${API_BASE_URL}/api/clubs/${clubId}/`);
         if (!res.ok) return;
         const data = await res.json();
         setOrgInfo(data);
@@ -54,7 +54,7 @@ export default function ProfilePage() {
       }
       setOrgPostsLoading(true);
       try {
-        const res = await fetch("/api/posts/");
+        const res = await fetch(`${API_BASE_URL}/api/posts/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         const filtered = Array.isArray(data)
@@ -184,7 +184,7 @@ export default function ProfilePage() {
       club: selectedPost.club ?? user?.orgId ?? user?.id ?? null,
       is_form: editForm.type === "event",
     };
-    fetch(`/api/posts/${selectedPost.id}/`, {
+    fetch(`${API_BASE_URL}/api/posts/${selectedPost.id}/`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -207,7 +207,7 @@ export default function ProfilePage() {
   const handleDeleteConfirm = () => {
     if (!selectedPost) return;
     setDeleteLoading(true);
-    fetch(`/api/posts/${selectedPost.id}/`, {
+    fetch(`${API_BASE_URL}/api/posts/${selectedPost.id}/`, {
       method: "DELETE",
       headers: {
         ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),

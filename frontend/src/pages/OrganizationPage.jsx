@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-
+import {API_BASE_URL} from "../config"
 export default function OrganizationPage() {
   const { orgId } = useParams();
   const { user } = useAuth();
@@ -21,7 +21,7 @@ export default function OrganizationPage() {
     const loadClub = async () => {
       setLoadingClub(true);
       try {
-        const res = await fetch(`/api/clubs/${orgId}/`);
+        const res = await fetch(`${API_BASE_URL}/api/clubs/${orgId}/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         setClub(data);
@@ -39,7 +39,7 @@ export default function OrganizationPage() {
     const loadPosts = async () => {
       setLoadingPosts(true);
       try {
-        const res = await fetch("/api/posts/");
+        const res = await fetch(`${API_BASE_URL}/api/posts/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         const filtered = Array.isArray(data)
@@ -64,7 +64,7 @@ export default function OrganizationPage() {
       }
       setSubsLoading(true);
       try {
-        const res = await fetch("/api/subscriptions/");
+        const res = await fetch(`${API_BASE_URL}/api/subscriptions/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         const found = Array.isArray(data)
@@ -126,7 +126,7 @@ export default function OrganizationPage() {
       setSubsLoading(true);
       if (!subscriptionId) {
         // subscribe
-        const res = await fetch("/api/subscriptions/", {
+        const res = await fetch(`${API_BASE_URL}/api/subscriptions/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user: user.id, club: Number(orgId) }),
@@ -136,7 +136,7 @@ export default function OrganizationPage() {
         setSubscriptionId(data?.id || Date.now());
       } else {
         // unsubscribe
-        await fetch(`/api/subscriptions/${subscriptionId}/`, {
+        await fetch(`${API_BASE_URL}/api/subscriptions/${subscriptionId}/`, {
           method: "DELETE",
         });
         setSubscriptionId(null);
