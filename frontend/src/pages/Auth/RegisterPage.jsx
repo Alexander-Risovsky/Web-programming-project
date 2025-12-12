@@ -5,7 +5,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
-    group: "",
+    username: "",
     email: "",
     password: "",
   });
@@ -18,9 +18,37 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise((res) => setTimeout(res, 800));
-    setLoading(false);
-    navigate("/");
+    try {
+      const payload = {
+        username: form.username.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        student_name: form.firstName.trim(),
+        student_surname: form.lastName.trim(),
+      };
+
+      const res = await fetch("/api/auth/register/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const contentType = res.headers.get("content-type") || "";
+      const isJson = contentType.toLowerCase().includes("application/json");
+      const data = isJson ? await res.json() : null;
+
+      if (!res.ok) {
+        throw new Error(
+          data?.detail || data?.error || "Не удалось зарегистрироваться"
+        );
+      }
+
+      navigate("/login");
+    } catch (err) {
+      alert(err.message || "Ошибка регистрации");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,7 +82,7 @@ export default function RegisterPage() {
           -
         </span>
         <span className="text-sm font-medium text-center sm:text-lg text-slate-600 sm:text-left">
-          Студенческие мероприятия и организации университета
+          Создайте аккаунт в системе HSE Flow
         </span>
       </header>
 
@@ -69,7 +97,7 @@ export default function RegisterPage() {
                 Регистрация
               </h1>
               <p className="text-xs sm:text-sm text-slate-600">
-                Создайте аккаунт
+                Заполните поля, чтобы создать аккаунт
               </p>
             </div>
 
@@ -105,28 +133,30 @@ export default function RegisterPage() {
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700">
-                    Группа
+                    Логин
                   </label>
                   <input
                     type="text"
-                    value={form.group}
-                    onChange={handleChange("group")}
-                    placeholder="Напр.: ПИ-23-1"
+                    value={form.username}
+                    onChange={handleChange("username")}
+                    placeholder="Введите логин"
                     className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
+                    required
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700">
-                    Курс
+                    Пароль
                   </label>
                   <input
-                    type="text"
-                    value={form.lastName}
-                    onChange={handleChange("lastName")}
-                    placeholder="Например: 3"
+                    type="password"
+                    value={form.password}
+                    onChange={handleChange("password")}
+                    placeholder="Введите пароль"
                     className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
                     required
                   />
@@ -137,26 +167,11 @@ export default function RegisterPage() {
                 <label className="block text-sm font-semibold text-slate-700">
                   E-mail
                 </label>
-
                 <input
                   type="email"
                   value={form.email}
                   onChange={handleChange("email")}
                   placeholder="Введите e-mail"
-                  className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-700">
-                  Пароль
-                </label>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={handleChange("password")}
-                  placeholder="Введите пароль"
                   className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
                   required
                 />
@@ -188,7 +203,7 @@ export default function RegisterPage() {
                 to="/org/register"
                 className="transition-colors hover:text-primary"
               >
-                Регистрация организации
+                Регистрация для организации
               </Link>
             </p>
           </div>

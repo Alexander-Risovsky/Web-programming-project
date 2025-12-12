@@ -3,11 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 
 export default function OrgRegisterPage() {
   const [form, setForm] = useState({
-    orgName: "",
-    orgLogin: "",
-    orgPassword: "",
+    name: "",
+    username: "",
+    email: "",
+    password: "",
+    description: "",
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleChange = (field) => (e) =>
@@ -15,10 +18,39 @@ export default function OrgRegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
-    await new Promise((res) => setTimeout(res, 800));
-    setLoading(false);
-    navigate("/");
+    try {
+      const payload = {
+        username: form.username.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        name: form.name.trim(),
+        description: form.description.trim(),
+      };
+
+      const res = await fetch("/api/auth/register-club/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const contentType = res.headers.get("content-type") || "";
+      const isJson = contentType.toLowerCase().includes("application/json");
+      const data = isJson ? await res.json() : null;
+
+      if (!res.ok) {
+        throw new Error(
+          data?.detail || data?.error || "Не удалось зарегистрировать клуб"
+        );
+      }
+
+      navigate("/org/login");
+    } catch (err) {
+      setError(err.message || "Ошибка регистрации клуба");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,7 +84,7 @@ export default function OrgRegisterPage() {
           -
         </span>
         <span className="text-sm font-medium text-center sm:text-lg text-slate-600 sm:text-left">
-          Регистрация организации
+          Регистрация новой студорганизации
         </span>
       </header>
 
@@ -67,9 +99,31 @@ export default function OrgRegisterPage() {
                 Регистрация организации
               </h1>
               <p className="text-xs sm:text-sm text-slate-600">
-                Укажите данные вашей организации для доступа в систему
+                Укажите данные о клубе. После регистрации вы сможете войти как
+                организация.
               </p>
             </div>
+
+            {error && (
+              <div className="p-4 mb-6 text-red-700 border-2 border-red-200 bg-red-50 rounded-xl animate-slide-up">
+                <div className="flex items-center gap-2">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span>{error}</span>
+                </div>
+              </div>
+            )}
 
             <form
               onSubmit={handleSubmit}
@@ -81,8 +135,8 @@ export default function OrgRegisterPage() {
                 </label>
                 <input
                   type="text"
-                  value={form.orgName}
-                  onChange={handleChange("orgName")}
+                  value={form.name}
+                  onChange={handleChange("name")}
                   placeholder="Название"
                   className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
                   required
@@ -96,9 +150,9 @@ export default function OrgRegisterPage() {
 
                 <input
                   type="text"
-                  value={form.orgLogin}
-                  onChange={handleChange("orgLogin")}
-                  placeholder="Придумайте логин"
+                  value={form.username}
+                  onChange={handleChange("username")}
+                  placeholder="Введите логин"
                   className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
                   required
                 />
@@ -106,15 +160,42 @@ export default function OrgRegisterPage() {
 
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-slate-700">
-                  Пароль организации
+                  E-mail
+                </label>
+                <input
+                  type="text"
+                  value={form.email}
+                  onChange={handleChange("email")}
+                  placeholder="Введите e-mail"
+                  className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  Пароль
                 </label>
                 <input
                   type="password"
-                  value={form.orgPassword}
-                  onChange={handleChange("orgPassword")}
-                  placeholder="Придумайте пароль"
+                  value={form.password}
+                  onChange={handleChange("password")}
+                  placeholder="Введите пароль"
                   className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
                   required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  Описание
+                </label>
+                <textarea
+                  value={form.description}
+                  onChange={handleChange("description")}
+                  placeholder="Кратко расскажите об организации"
+                  className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
+                  rows={3}
                 />
               </div>
 
@@ -126,7 +207,7 @@ export default function OrgRegisterPage() {
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 translate-x-[-120%] opacity-0 group-hover:translate-x-[120%] group-hover:opacity-100 transition-all duration-700 will-change-transform" />
                 <span className="relative z-10">
                   {loading
-                    ? "Создаем аккаунт..."
+                    ? "Создаем организацию..."
                     : "Зарегистрировать организацию"}
                 </span>
               </button>
@@ -146,7 +227,7 @@ export default function OrgRegisterPage() {
                 to="/register"
                 className="transition-colors hover:text-primary"
               >
-                Регистрация пользователя
+                Регистрация как студент
               </Link>
             </p>
           </div>

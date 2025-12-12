@@ -1,6 +1,5 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { organizations } from "../data/mockOrgsAndPosts";
 import { useAuth } from "../context/AuthContext";
 
 export default function LeftSidebar({
@@ -11,27 +10,102 @@ export default function LeftSidebar({
   const location = useLocation();
   const { user, isOrg } = useAuth();
 
+  const [orgInfo, setOrgInfo] = useState(null);
+  const [clubs, setClubs] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [subsVersion, setSubsVersion] = useState(0);
+  const [subsLoading, setSubsLoading] = useState(false);
+  const [subsStatus, setSubsStatus] = useState("loading"); // loading | refreshing | null
+
+  // закрываем меню при смене маршрута
   useEffect(() => {
-    if (mobileMenuOpen) {
-      setMobileMenuOpen(false);
-    }
+    if (mobileMenuOpen) setMobileMenuOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   const handleLinkClick = () => {
-    if (setMobileMenuOpen) {
-      setMobileMenuOpen(false);
-    }
+    if (setMobileMenuOpen) setMobileMenuOpen(false);
   };
 
+  // загрузка инфо организации
+  useEffect(() => {
+    const loadOrg = async () => {
+      if (user?.role !== "org") {
+        setOrgInfo(null);
+        return;
+      }
+      const clubId = user?.orgId || user?.id;
+      if (!clubId) return;
+      try {
+        const res = await fetch(`/api/clubs/${clubId}/`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setOrgInfo(data);
+      } catch {
+        setOrgInfo(null);
+      }
+    };
+    loadOrg();
+  }, [user]);
+
+  // загрузка клубов
+  useEffect(() => {
+    const loadClubs = async () => {
+      try {
+        const res = await fetch("/api/clubs/");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        setClubs(Array.isArray(data) ? data : []);
+      } catch {
+        setClubs([]);
+      }
+    };
+    loadClubs();
+  }, []);
+
+  // слушаем событие обновления подписок
+  useEffect(() => {
+    const handler = () => setSubsVersion((v) => v + 1);
+    window.addEventListener("subscriptions-updated", handler);
+    return () => window.removeEventListener("subscriptions-updated", handler);
+  }, []);
+
+  // загрузка подписок студента
+  useEffect(() => {
+    const loadSubs = async () => {
+      if (user?.role !== "student" || !user?.id) {
+        setSubscriptions([]);
+        setSubsStatus(null);
+        return;
+      }
+      const status = subsVersion > 0 ? "refreshing" : "loading";
+      setSubsStatus(status);
+      setSubsLoading(true);
+      try {
+        const res = await fetch("/api/subscriptions/");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const subs = Array.isArray(data)
+          ? data.filter((s) => s.user === user.id)
+          : [];
+        setSubscriptions(subs);
+        setSubsStatus(null);
+      } catch {
+        setSubscriptions([]);
+        setSubsStatus(null);
+      } finally {
+        setSubsLoading(false);
+      }
+    };
+    loadSubs();
+  }, [user, subsVersion]);
+
+  const orgName =
+    user?.role === "org"
+      ? orgInfo?.name || user?.orgName || user?.username || "Организация"
+      : null;
+
   const sections = [{ id: "home", name: "Главная", to: "/" }];
-
-  // Подписки текущего студента
-  const followedOrgIds = [1, 2, 4, 5, 6];
-  const followedOrgs = organizations.filter((o) =>
-    followedOrgIds.includes(o.id)
-  );
-
 
   const getIcon = (id, active) => {
     const cls = `w-7 h-7 ${
@@ -58,6 +132,13 @@ export default function LeftSidebar({
         return null;
     }
   };
+
+  const followedOrgIds =
+    user?.role === "student" ? subscriptions.map((s) => s.club) : [];
+  const followedOrgs =
+    user?.role === "student"
+      ? clubs.filter((o) => followedOrgIds.includes(o.id))
+      : [];
 
   return (
     <aside
@@ -132,9 +213,10 @@ export default function LeftSidebar({
                       `}
                     >
                       <div
-                        className={`absolute inset-0 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm ${
-                          isActive ? "opacity-100" : ""
-                        }`}
+                        className={`
+                          absolute inset-0 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm ${
+                            isActive ? "opacity-100" : ""
+                          }`}
                       />
                       <div
                         className={`transition-all duration-300 relative z-10 ${
@@ -161,6 +243,13 @@ export default function LeftSidebar({
             <h3 className="mb-2 text-sm font-semibold tracking-wider uppercase text-slate-600">
               Подписки
             </h3>
+            {subsStatus && (
+              <div className="mb-2 text-xs text-slate-500">
+                {subsStatus === "loading"
+                  ? "Загрузка подписок..."
+                  : "Обновление подписок..."}
+              </div>
+            )}
             <ul className="space-y-2">
               {followedOrgs.map((org, index) => {
                 const to = `/organization/${org.id}`;
@@ -195,12 +284,13 @@ export default function LeftSidebar({
                         `}
                       >
                         <div
-                          className={`absolute inset-0 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm ${
-                            isActive ? "opacity-100" : ""
-                          }`}
+                          className={`
+                            absolute inset-0 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm ${
+                              isActive ? "opacity-100" : ""
+                            }`}
                         />
                         <img
-                         src={org.avatar_url || "/OrganizationLogo/DefaultLogo.jpg"}
+                          src={org.avatar_url || "/OrganizationLogo/DefaultLogo.jpg"}
                           alt={org.name}
                           className="relative z-10 object-cover rounded-md w-7 h-7"
                           onError={(e) => {
@@ -216,6 +306,9 @@ export default function LeftSidebar({
                   </li>
                 );
               })}
+              {!subsLoading && followedOrgs.length === 0 && (
+                <li className="text-sm text-slate-500">Нет подписок</li>
+              )}
             </ul>
           </div>
         )}
@@ -243,15 +336,18 @@ export default function LeftSidebar({
                 />
               </svg>
             </div>
-            {/* <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" /> */}
           </div>
 
           <div className="flex flex-col flex-1 min-w-0 ml-2">
             <span className="text-sm font-semibold leading-tight truncate transition-colors duration-300 text-slate-800 group-hover:text-primary">
-              {user.username}
+              {isOrg
+                ? orgName
+                : `${user?.studentProfile?.name || ""} ${
+                    user?.studentProfile?.surname || ""
+                  }`.trim() || user?.username || "Пользователь"}
             </span>
             <span className="text-xs leading-tight truncate text-slate-500">
-              {user.role}
+              {isOrg ? "Организация" : "Студент"}
             </span>
           </div>
         </NavLink>
