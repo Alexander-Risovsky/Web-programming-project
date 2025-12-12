@@ -1,0 +1,3 @@
+meta:
+  dockerfile: backend/Dockerfile
+  context: backend
