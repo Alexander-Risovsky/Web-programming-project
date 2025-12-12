@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,13 +15,13 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const result = await loginStudent(email);
+      const result = await loginStudent(username, password);
       if (!result?.success) {
-        throw new Error(result?.error || "Ошибка входа");
+        throw new Error(result?.error || "Не удалось войти. Проверьте данные.");
       }
       navigate("/");
     } catch (err) {
-      setError("Не удалось войти. Проверьте данные.");
+      setError(err.message || "Не удалось войти. Проверьте данные.");
     } finally {
       setLoading(false);
     }
@@ -58,7 +58,7 @@ export default function LoginPage() {
           -
         </span>
         <span className="text-sm font-medium text-center sm:text-lg text-slate-600 sm:text-left">
-          Добро пожаловать! Введите данные для входа студента
+          Вход в систему HSE Flow. Используйте свой логин и пароль.
         </span>
       </header>
 
@@ -73,7 +73,7 @@ export default function LoginPage() {
                 Вход
               </h1>
               <p className="text-xs sm:text-sm text-slate-600">
-                Используйте ваш студенческий e-mail и пароль
+                Введите логин и пароль, чтобы продолжить
               </p>
             </div>
 
@@ -104,7 +104,7 @@ export default function LoginPage() {
             >
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-slate-700">
-                  E-mail
+                  Логин
                 </label>
                 <div className="relative">
                   <div className="absolute -translate-y-1/2 left-3 sm:left-4 top-1/2">
@@ -130,9 +130,9 @@ export default function LoginPage() {
                   </div>
                   <input
                     type="text"
-                    placeholder="Ваш e-mail"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Введите логин"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     disabled={loading}
                     className="w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-3.5 text-base rounded-xl bg-white border-2 border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     required
@@ -162,7 +162,7 @@ export default function LoginPage() {
                   </div>
                   <input
                     type="password"
-                    placeholder="Пароль"
+                    placeholder="Введите пароль"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loading}
@@ -182,7 +182,7 @@ export default function LoginPage() {
                   {loading ? (
                     <>
                       <div className="w-5 h-5 border-b-2 border-white rounded-full animate-spin" />
-                      <span>Вход...</span>
+                      <span>Входим...</span>
                     </>
                   ) : (
                     <>

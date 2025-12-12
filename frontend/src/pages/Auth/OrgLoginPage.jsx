@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 export default function OrgLoginPage() {
-  const [login, setLogin] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,13 +15,13 @@ export default function OrgLoginPage() {
     setError("");
     setLoading(true);
     try {
-      const result = await loginOrg({ login, orgId: 1 });
+      const result = await loginOrg({ username, password });
       if (!result?.success) {
-        throw new Error(result?.error || "Ошибка входа");
+        throw new Error(result?.error || "Не удалось войти. Проверьте данные.");
       }
       navigate("/");
     } catch (err) {
-      setError("Не удалось войти. Проверьте данные.");
+      setError(err.message || "Не удалось войти. Проверьте данные.");
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ export default function OrgLoginPage() {
         </div>
         <span className="hidden text-2xl font-medium sm:inline text-slate-400">-</span>
         <span className="text-sm font-medium text-center sm:text-lg text-slate-600 sm:text-left">
-          Вход для студорганизации
+          Вход для организации
         </span>
       </header>
 
@@ -67,7 +67,7 @@ export default function OrgLoginPage() {
                 Вход для организации
               </h1>
               <p className="text-xs sm:text-sm text-slate-600">
-                Введите логин организации и пароль, выданные администратором
+                Введите логин и пароль, выданные для вашей студорганизации
               </p>
             </div>
 
@@ -95,8 +95,8 @@ export default function OrgLoginPage() {
                   <input
                     type="text"
                     placeholder="Логин"
-                    value={login}
-                    onChange={(e) => setLogin(e.target.value)}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     disabled={loading}
                     className="w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-3.5 text-base rounded-xl bg-white border-2 border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     required
@@ -114,7 +114,7 @@ export default function OrgLoginPage() {
                   </div>
                   <input
                     type="password"
-                    placeholder="Пароль"
+                    placeholder="Введите пароль"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loading}
@@ -134,7 +134,7 @@ export default function OrgLoginPage() {
                   {loading ? (
                     <>
                       <div className="w-5 h-5 border-b-2 border-white rounded-full animate-spin" />
-                      <span>Вход...</span>
+                      <span>Входим...</span>
                     </>
                   ) : (
                     <>
@@ -156,7 +156,7 @@ export default function OrgLoginPage() {
             </p>
             <p className="mt-2 text-xs text-center text-slate-400">
               <Link to="/login" className="transition-colors hover:text-primary">
-                Вход для студента
+                Вход как студент
               </Link>
             </p>
           </div>

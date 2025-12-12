@@ -1,22 +1,48 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+} from "react";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // TODO: заменить на реальные данные после интеграции с API
-  const [user, setUser] = useState({
-    id: 1,
-    username: "Студент",
-    role: "student", // "student" | "org"
-    orgId: null,
+  // user: null | { id, username, role: "student" | "org", orgId?, email?, avatarUrl?, studentProfile? }
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("authUser");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
+
+  useEffect(() => {
+    try {
+      if (user) {
+        localStorage.setItem("authUser", JSON.stringify(user));
+      } else {
+        localStorage.removeItem("authUser");
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [user]);
 
   const loginStudent = async (username, password) => {
     try {
+      const payload = {
+        username: (username || "").trim(),
+        password: password || "",
+      };
+
       const res = await fetch("/api/auth/login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        credentials: "include",
+        body: JSON.stringify(payload),
       });
 
       const contentType = res.headers.get("content-type") || "";
@@ -25,47 +51,87 @@ export function AuthProvider({ children }) {
         data = await res.json();
       } else {
         const text = await res.text();
-        throw new Error(text || "Некорректный ответ сервера");
+        throw new Error(text || "Сервер вернул ответ в неизвестном формате");
       }
 
       if (!res.ok) {
-        throw new Error(data?.detail || "Неверный логин или пароль");
+        throw new Error(
+          data?.detail || "Не удалось войти. Проверьте логин и пароль"
+        );
       }
 
+      const userData = data?.user || data || {};
+
       setUser({
-        id: data.id,
-        username: data.username,
-        email: data.email,
-        avatarUrl: data.avatar_url,
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        avatarUrl: userData.avatar_url,
         role: "student",
         orgId: null,
-        studentProfile: data.student_profile,
+        studentProfile: userData.student_profile,
+        access: data?.access,
+        refresh: data?.refresh,
       });
 
       return { success: true };
     } catch (err) {
-      return { success: false, error: err.message || "Ошибка авторизации" };
+      return {
+        success: false,
+        error: err.message || "Не удалось войти. Попробуйте снова",
+      };
     }
   };
 
-  const loginOrg = async ({ login, orgId }) => {
-    // мок: заменить валидацией на сервере
-    setUser({
-      id: orgId || 100,
-      username: login || "Организация",
-      role: "org",
-      orgId: orgId || 100,
-    });
-    return { success: true };
+  const loginOrg = async ({ username, password }) => {
+    try {
+      const payload = {
+        username: (username || "").trim(),
+        password: password || "",
+      };
+
+      const res = await fetch("/api/auth/login/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      const contentType = res.headers.get("content-type") || "";
+      const isJson = contentType.toLowerCase().includes("application/json");
+      const data = isJson ? await res.json() : null;
+
+      if (!res.ok) {
+        throw new Error(
+          data?.detail || "Не удалось войти. Проверьте логин и пароль"
+        );
+      }
+
+      const orgData = data?.user || data || {};
+
+      setUser({
+        id: orgData.id,
+        username: orgData.username,
+        email: orgData.email,
+        avatarUrl: orgData.avatar_url,
+        role: "org",
+        orgId: orgData.id,
+        orgName: orgData.name, // сохраняем название организации
+        access: data?.access,
+        refresh: data?.refresh,
+      });
+
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.message || "Не удалось войти. Попробуйте снова",
+      };
+    }
   };
 
   const logout = () => {
-    setUser({
-      id: null,
-      username: "",
-      role: "guest",
-      orgId: null,
-    });
+    setUser(null);
   };
 
   const value = useMemo(

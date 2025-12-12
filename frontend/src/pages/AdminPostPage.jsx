@@ -1,47 +1,79 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
+import { createPortal } from "react-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function AdminPostPage() {
+  const { user } = useAuth();
+  const isOrg = user?.role === "org";
+
   const [type, setType] = useState("info"); // info | event
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [questions, setQuestions] = useState([]);
-  const [newQuestion, setNewQuestion] = useState("");
-  const [imageFile, setImageFile] = useState(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState(null); // {type, message}
 
-  const handleAddQuestion = () => {
-    if (!newQuestion.trim()) return;
-    setQuestions((prev) => [...prev, { id: Date.now(), text: newQuestion.trim() }]);
-    setNewQuestion("");
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
   };
 
-  const handleRemoveQuestion = (id) => {
-    setQuestions((prev) => prev.filter((q) => q.id !== id));
-  };
-
-  function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      type,
-      title,
-      content,
-      image: imageFile?.name || "",
-      questions: type === "event" ? questions : [],
-    };
-    alert(
-      `Создан пост (${type === "event" ? "мероприятие" : "информационный"}):\n\n${title}\n\n${content}\n\nКартинка: ${
-        payload.image || "не выбрана"
-      }\n\nВопросов: ${payload.questions.length}`
-    );
-    setTitle("");
-    setContent("");
-    setQuestions([]);
-    setNewQuestion("");
-    setType("info");
-    setImageFile(null);
-  }
+    if (!isOrg) {
+      showToast("error", "Создавать посты может только организация");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const payload = {
+        type,
+        title,
+        content,
+        image_url: imageUrl || "",
+        is_form: type === "event",
+        club: user?.orgId || user?.id,
+        form: null,
+      };
+
+      const res = await fetch("/api/posts/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.detail || "Не удалось создать пост");
+      }
+
+      showToast("success", "Пост опубликован");
+      setTitle("");
+      setContent("");
+      setImageUrl("");
+      setType("info");
+    } catch (err) {
+      showToast("error", err.message || "Ошибка публикации");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <section className="max-w-3xl mx-auto space-y-4 animate-slide-up">
+      {toast &&
+        createPortal(
+          <div className="fixed inset-x-0 top-2 z-[40000] flex justify-center pointer-events-none animate-slide-up">
+            <div
+              className={`px-5 py-3 rounded-xl shadow-lg text-white pointer-events-auto ${
+                toast.type === "success" ? "bg-emerald-400" : "bg-rose-400"
+              }`}
+            >
+              {toast.message}
+            </div>
+          </div>,
+          document.body
+        )}
+
       <div className="p-6 glass-card lg:p-8">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div>
@@ -99,16 +131,14 @@ export default function AdminPostPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700">Картинка поста</label>
+            <label className="text-sm font-semibold text-slate-700">Картинка (URL)</label>
             <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-              className="w-full px-4 py-2 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md file:mr-3 file:px-3 file:py-2 file:border-0 file:rounded-lg file:bg-primary/10 file:text-primary file:cursor-pointer"
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://..."
+              className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
             />
-            {imageFile && (
-              <p className="text-xs text-slate-500">Выбрано: {imageFile.name}</p>
-            )}
           </div>
 
           {type === "event" && (
@@ -116,59 +146,19 @@ export default function AdminPostPage() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">Форма регистрации</p>
-                  <p className="text-xs text-slate-500">
-                    Добавьте вопросы, которые увидит пользователь при регистрации
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newQuestion}
-                    onChange={(e) => setNewQuestion(e.target.value)}
-                    placeholder="Например: Ваш курс?"
-                    className="px-3 py-2 text-sm border-2 rounded-lg border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddQuestion}
-                    className="px-3 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg transition-all"
-                  >
-                    Добавить
-                  </button>
+                  <p className="text-xs text-slate-500">Вопросы добавим позже</p>
                 </div>
               </div>
-              {questions.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  Пока нет вопросов. Добавьте первый вопрос для регистрации.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {questions.map((q) => (
-                    <div
-                      key={q.id}
-                      className="flex items-center justify-between px-3 py-2 bg-white border rounded-lg border-slate-200"
-                    >
-                      <span className="text-sm text-slate-800">{q.text}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveQuestion(q.id)}
-                        className="text-xs font-semibold text-red-600 hover:text-red-700"
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
           <div className="flex gap-3">
             <button
               type="submit"
-              className="px-5 py-3 bg-gradient-to-r from-primary via-purple-600 to-indigo-600 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.01]"
+              disabled={submitting}
+              className="px-5 py-3 bg-gradient-to-r from-primary via-purple-600 to-indigo-600 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Опубликовать
+              {submitting ? "Публикуем..." : "Опубликовать"}
             </button>
           </div>
         </form>

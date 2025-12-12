@@ -4,11 +4,16 @@ import { posts, organizations } from "../data/mockOrgsAndPosts";
 
 export default function ProfilePage() {
   const { user } = useAuth();
+  const isOrg = user?.role === "org" || (!!user?.orgId && !user?.studentProfile);
+  const [orgInfo, setOrgInfo] = useState(null);
+  const [orgPostsRemote, setOrgPostsRemote] = useState([]);
+  const [orgPostsLoading, setOrgPostsLoading] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState(null);
+
   const [selectedPost, setSelectedPost] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [statsModalOpen, setStatsModalOpen] = useState(false);
-  const [menuOpenId, setMenuOpenId] = useState(null);
   const [editForm, setEditForm] = useState({
     title: "",
     content: "",
@@ -16,13 +21,77 @@ export default function ProfilePage() {
     type: "info",
     image: "",
   });
+  const [toast, setToast] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Загрузка инфо об организации
+  useEffect(() => {
+    const loadOrg = async () => {
+      if (!isOrg) {
+        setOrgInfo(null);
+        return;
+      }
+      const clubId = user?.orgId || user?.id;
+      if (!clubId) return;
+      try {
+        const res = await fetch(`/api/clubs/${clubId}/`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setOrgInfo(data);
+      } catch {
+        // молча
+      }
+    };
+    loadOrg();
+  }, [user]);
+
+  // Загрузка постов организации
+  useEffect(() => {
+    const loadOrgPosts = async () => {
+      if (!isOrg) {
+        setOrgPostsRemote([]);
+        return;
+      }
+      setOrgPostsLoading(true);
+      try {
+        const res = await fetch("/api/posts/");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const filtered = Array.isArray(data)
+          ? data.filter((p) => p.club === (user.orgId || user.id))
+          : [];
+        setOrgPostsRemote(filtered);
+      } catch {
+        setOrgPostsRemote([]);
+      } finally {
+        setOrgPostsLoading(false);
+      }
+    };
+    loadOrgPosts();
+  }, [user]);
+
+  const orgDisplayName =
+    isOrg
+      ? orgInfo?.name ||
+        user?.orgName ||
+        organizations.find((o) => o.id === user.orgId)?.name ||
+        user?.username ||
+        "Организация"
+      : null;
 
   const displayUser = {
-    name: user?.username || "Студент",
+    name:
+      isOrg
+        ? orgDisplayName
+        : `${user?.studentProfile?.name || ""} ${
+            user?.studentProfile?.surname || ""
+          }`.trim() ||
+          user?.username ||
+          "Пользователь",
     email: user?.email || "user@edu.hse.ru",
-    group: user?.group || "ИБ-23-1",
-    course: user?.course || "3 курс",
-    role: user?.role === "org" ? "Организация" : "Студент",
+    group: user?.studentProfile?.group || "Группа",
+    course: user?.studentProfile?.course || "Курс",
+    role: isOrg ? "Организация" : "Студент",
     followers: user?.followers ?? 1240,
   };
 
@@ -37,11 +106,25 @@ export default function ProfilePage() {
   );
 
   const orgPosts = useMemo(() => {
-    if (user?.role !== "org") return [];
-    return posts
-      .filter((p) => p.orgId === (user.orgId || 0))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [user]);
+    if (!isOrg) return [];
+    return orgPostsRemote
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(b.published_at || b.date || 0) -
+          new Date(a.published_at || a.date || 0)
+      );
+  }, [user, orgPostsRemote]);
+
+  const formatDate = (value) => {
+    if (!value) return "--";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "--";
+    const dd = parsed.getDate().toString().padStart(2, "0");
+    const mm = (parsed.getMonth() + 1).toString().padStart(2, "0");
+    const yyyy = parsed.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  };
 
   const getOrg = (orgId) => organizations.find((o) => o.id === orgId);
 
@@ -63,11 +146,13 @@ export default function ProfilePage() {
     setEditForm({
       title: post.title || "",
       content: post.content || "",
-      date: post.date || "",
+      date:
+        (post.published_at || post.date || "").toString().slice(0, 10) || "",
       type: post.type || "info",
-      image: post.image || "",
+      image: post.image_url || post.image || "",
     });
     setEditModalOpen(true);
+    setMenuOpenId(null);
   };
 
   const openDelete = (post) => {
@@ -89,17 +174,74 @@ export default function ProfilePage() {
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
-    // Здесь будет запрос на сохранение
-    closeModals();
+    if (!selectedPost) return;
+    const payload = {
+      title: editForm.title,
+      content: editForm.content,
+      type: editForm.type,
+      image_url: editForm.image || null,
+      published_at: editForm.date || null,
+      club: selectedPost.club ?? user?.orgId ?? user?.id ?? null,
+      is_form: editForm.type === "event",
+    };
+    fetch(`/api/posts/${selectedPost.id}/`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),
+      },
+      body: JSON.stringify(payload),
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed");
+        const updated = await res.json();
+        setOrgPostsRemote((prev) =>
+          prev.map((p) => (p.id === updated.id ? updated : p))
+        );
+        closeModals();
+      })
+      .catch(() => closeModals());
   };
 
   const handleDeleteConfirm = () => {
-    // Здесь будет запрос на удаление
-    closeModals();
+    if (!selectedPost) return;
+    setDeleteLoading(true);
+    fetch(`/api/posts/${selectedPost.id}/`, {
+      method: "DELETE",
+      headers: {
+        ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),
+      },
+      credentials: "include",
+    })
+      .then(() => {
+        setOrgPostsRemote((prev) =>
+          prev.filter((p) => p.id !== selectedPost.id)
+        );
+        setToast({ type: "error", message: "Пост удалён" });
+        setTimeout(() => setToast(null), 4000);
+        closeModals();
+      })
+      .catch(() => {
+        setToast({ type: "error", message: "Не удалось удалить пост" });
+        setTimeout(() => setToast(null), 4000);
+        closeModals();
+      })
+      .finally(() => setDeleteLoading(false));
   };
 
   return (
     <>
+      {toast && (
+        <div
+          className="fixed top-4 left-1/2 z-[40000] -translate-x-1/2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white animate-slide-up transition-all duration-500"
+          style={{
+            background: "linear-gradient(135deg, #ef4444, #b91c1c)",
+          }}
+        >
+          {toast.message}
+        </div>
+      )}
       <section className="max-w-5xl mx-auto space-y-5 animate-slide-up">
         <div className="flex flex-col gap-5 p-6 glass-card lg:p-8 md:flex-row md:items-center">
           <div className="relative">
@@ -127,7 +269,7 @@ export default function ProfilePage() {
               {displayUser.name}
             </h1>
             <p className="text-slate-600">{displayUser.email}</p>
-            {user?.role === "org" ? (
+            {isOrg ? (
               <p className="text-slate-600">
                 Подписчики: {displayUser.followers}
               </p>
@@ -143,7 +285,7 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {user?.role !== "org" && (
+        {!isOrg && (
           <div className="p-6 space-y-4 glass-card lg:p-8">
             <h2 className="text-xl font-bold text-slate-900 lg:text-2xl">
               Мои регистрации на мероприятия
@@ -191,39 +333,45 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {user?.role === "org" && (
+        {isOrg && (
           <div className="p-6 space-y-4 glass-card lg:p-8">
             <h2 className="text-xl font-bold text-slate-900 lg:text-2xl">
               Посты организации
             </h2>
-            {orgPosts.length === 0 ? (
-              <p className="text-slate-600">Пока нет постов.</p>
+            {orgPostsLoading ? (
+              <p className="text-slate-600">Загрузка постов...</p>
+            ) : orgPosts.length === 0 ? (
+              <p className="text-slate-600">Постов пока нет.</p>
             ) : (
               <div className="space-y-4">
                 {orgPosts.map((post, idx) => {
                   const org = getOrg(post.orgId);
+                  const dateValue = post.published_at || post.date;
+                  const isOpen = menuOpenId === post.id;
                   return (
                     <article
                       key={post.id}
-                      className="relative p-4 transition-shadow border shadow-sm lg:p-5 bg-white/90 border-slate-200 rounded-2xl hover:shadow-md animate-slide-up group"
+                      className={`relative p-4 transition-shadow border shadow-sm lg:p-5 bg-white/90 border-slate-200 rounded-2xl hover:shadow-md animate-slide-up group ${
+                        isOpen ? "z-50" : "z-0"
+                      }`}
                       style={{ animationDelay: `${idx * 80}ms` }}
                     >
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="space-y-1">
                           <p className="text-sm font-semibold text-primary">
-                            {org?.name || "Организация"}
+                            {org?.name || orgDisplayName || "Организация"}
                           </p>
                           <h3 className="text-lg font-bold text-slate-900 lg:text-xl">
                             {post.title}
                           </h3>
                           <span className="text-xs text-slate-500">
-                            {new Date(post.date).toLocaleDateString("ru-RU")}
+                            {formatDate(dateValue)}
                           </span>
                         </div>
                         <div className="relative post-menu-actions">
                           <button
                             className="flex items-center justify-center transition-colors bg-white border-2 w-9 h-9 rounded-xl border-slate-200 hover:border-primary hover:bg-primary/5"
-                            aria-label="Меню поста"
+                            aria-label="Открыть меню"
                             type="button"
                             onClick={() =>
                               setMenuOpenId((prev) =>
@@ -238,7 +386,7 @@ export default function ProfilePage() {
                             </span>
                           </button>
                           <div
-                            className={`absolute right-0 z-40 w-48 py-2 mt-2 text-sm bg-white border rounded-xl shadow-lg border-slate-200 origin-top-right ${
+                            className={`absolute right-0 z-50000 w-48 py-2 mt-2 text-sm bg-white border rounded-xl shadow-2xl border-slate-200 origin-top-right ${
                               menuOpenId === post.id
                                 ? "block animate-slide-up"
                                 : "hidden"
@@ -409,9 +557,12 @@ export default function ProfilePage() {
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
-                  className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-red-500 via-rose-500 to-orange-500 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all"
+                  className={`px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-red-500 via-rose-500 to-orange-500 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all ${
+                    deleteLoading ? "opacity-60 cursor-not-allowed" : ""
+                  }`}
+                  disabled={deleteLoading}
                 >
-                  Удалить
+                  {deleteLoading ? "Удаляем..." : "Удалить"}
                 </button>
               </div>
             </div>
