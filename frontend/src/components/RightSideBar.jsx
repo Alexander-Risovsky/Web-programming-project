@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import {API_BASE_URL} from "../config"
+import {API_BASE_URL, buildMediaUrl} from "../config"
 const events = [
   {
     id: 1,
@@ -155,7 +155,7 @@ export default function RightSidebar() {
                 className="flex items-center gap-3 flex-1"
               >
                 <img
-                  src={org.avatar_url || "/OrganizationLogo/DefaultLogo.jpg"}
+                  src={buildMediaUrl(org.avatar_url) || "/OrganizationLogo/DefaultLogo.jpg"}
                   alt={org.name}
                   onError={(e) => {
                     e.target.onerror = null;

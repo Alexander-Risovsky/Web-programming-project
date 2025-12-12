@@ -1,6 +1,7 @@
 import React from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { posts, organizations } from "../data/mockOrgsAndPosts";
+import { API_BASE_URL, buildMediaUrl } from "../config";
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -82,11 +83,11 @@ export default function SearchPage() {
                 style={{ animationDelay: `${idx * 60}ms` }}
               >
                 <div className="flex items-center gap-3">
-                  <img
-                    src={org.avatar_url || "/OrganizationLogo/DefaultLogo.jpg"}
-                    alt={org.name}
-                    className="w-12 h-12 rounded-xl object-cover border border-slate-200"
-                  />
+                    <img
+                      src={buildMediaUrl(org.avatar_url) || "/OrganizationLogo/DefaultLogo.jpg"}
+                      alt={org.name}
+                      className="w-12 h-12 rounded-xl object-cover border border-slate-200"
+                    />
                   <div>
                     <p className="font-semibold text-slate-800">{org.name}</p>
                     <p className="text-xs text-slate-500">Клуб • события • новости</p>
