@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from users.views import ClubViewSet, StudentViewSet
 from web.views import (
     FormViewSet,
     PostViewSet,
@@ -13,6 +14,8 @@ from web.views import (
 )
 
 router = DefaultRouter()
+router.register(r"clubs", ClubViewSet, basename="club")
+router.register(r"students", StudentViewSet, basename="student")
 router.register(r"forms", FormViewSet, basename="form")
 router.register(r"posts", PostViewSet, basename="post")
 router.register(r"registrations", RegistrationViewSet, basename="registration")
