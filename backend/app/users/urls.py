@@ -3,9 +3,6 @@ from .views import ClubViewSet, LoginClubView, RegisterClubView, RegisterView, L
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from rest_framework.routers import DefaultRouter
 
-router = DefaultRouter()
-router.register(r"clubs", ClubViewSet, basename="club")
-router.register(r"students", StudentViewSet, basename="student")
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
@@ -15,4 +12,3 @@ urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("token/verify/", TokenVerifyView.as_view(), name="token_verify"),
 ]
-urlpatterns += router.urls

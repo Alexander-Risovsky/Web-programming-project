@@ -106,6 +106,23 @@ class RegisterClubView(APIView):
                 "password": "strongpassword123",
             },
             request_only=True,
+        ),
+        OpenApiExample(
+            'Response example',
+            value={
+                "student": {
+                    "id": 1,
+                    "name": "Иван",
+                    "surname": "Иванов",
+                    "course": "3",
+                    "group": "ПИ-23-1",
+                    "major": "Программная инженерия",
+                    "avatar_url": "http://localhost:8000/media/student_avatars/sample.jpg"
+                },
+                "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.access_example",
+                "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.refresh_example"
+            },
+            response_only=True,
         )
     ],
 )
@@ -140,6 +157,21 @@ class LoginStudentView(APIView):
                 "password": "strongpassword123",
             },
             request_only=True,
+        ),
+        OpenApiExample(
+            'Response example',
+            value={
+                "club": {
+                    "id": 10,
+                    "name": "Strike Club",
+                    "description": "Клуб для любителей спорта",
+                    "avatar_url": "http://localhost:8000/media/club_avatars/strike.jpg",
+                    "created_at": "2025-12-12T19:00:00Z"
+                },
+                "access": "eyJ...access_example",
+                "refresh": "eyJ...refresh_example"
+            },
+            response_only=True,
         )
     ],
 )
