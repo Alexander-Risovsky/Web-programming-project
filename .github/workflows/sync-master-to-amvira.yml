@@ -1,0 +1,35 @@
+name: Sync master -> amvira/master
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - master
+
+jobs:
+  sync:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Add amvira remote
+        run: |
+          git remote add amvira https://github.com/Alexander-Risovsky/amvira.git
+          git fetch amvira
+
+      - name: Push master -> amvira/master
+        env:
+          GITHUB_TOKEN: ${{ secrets.AMVIRA_TOKEN }}
+        run: |
+          git checkout master
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/Alexander-Risovsky/amvira.git master --force
