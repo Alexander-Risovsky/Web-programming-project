@@ -83,7 +83,7 @@ export default function SearchPage() {
               >
                 <div className="flex items-center gap-3">
                   <img
-                    src={`/OrganizationLogo/${org.logo || "DefaultLogo.jpg"}`}
+                    src={org.avatar_url || "/OrganizationLogo/DefaultLogo.jpg"}
                     alt={org.name}
                     className="w-12 h-12 rounded-xl object-cover border border-slate-200"
                   />
