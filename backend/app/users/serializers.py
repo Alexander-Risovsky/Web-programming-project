@@ -67,16 +67,16 @@ class RegisterClubSerializer(serializers.Serializer):
 
 class StudentSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
-
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_username = serializers.CharField(source='user.username', read_only=True)
     class Meta:
         model = Student
-        fields = ("id", "name", "surname", "course", "group", "major", "avatar_url")
+        fields = ("id", "name", "surname", "course", "group", "major", "avatar_url", "user_email", "user_username")
 
     def get_avatar_url(self, obj):
-        request = self.context.get("request")
         if obj.avatar_url:
             url = obj.avatar_url.url
-            return request.build_absolute_uri(url) if request else url
+            return url
         return None
 
 
@@ -99,7 +99,7 @@ class ClubSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if obj.avatar_url:
             url = obj.avatar_url.url
-            return request.build_absolute_uri(url) if request else url
+            return url
         return None
 
 class LoginSerializer(serializers.Serializer):

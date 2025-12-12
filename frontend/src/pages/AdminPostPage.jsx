@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
+import {API_BASE_URL} from "../config"
 
 export default function AdminPostPage() {
   const { user } = useAuth();
@@ -36,7 +37,7 @@ export default function AdminPostPage() {
         form: null,
       };
 
-      const res = await fetch("/api/posts/", {
+      const res = await fetch(`${API_BASE_URL}/api/posts/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

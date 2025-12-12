@@ -5,7 +5,7 @@ import React, {
   useState,
   useEffect,
 } from "react";
-
+import {API_BASE_URL} from "../config"
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
         password: password || "",
       };
 
-      const res = await fetch("/api/auth/login/", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -60,7 +60,8 @@ export function AuthProvider({ children }) {
         );
       }
 
-      const userData = data?.user || data || {};
+      const userData = data?.student || data || {};
+      console.log("Logged in student:", userData,data);
 
       setUser({
         id: userData.id,
@@ -90,7 +91,7 @@ export function AuthProvider({ children }) {
         password: password || "",
       };
 
-      const res = await fetch("/api/auth/login/", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

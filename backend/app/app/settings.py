@@ -27,10 +27,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-98_lk+4f9g$yv*(n38_yis31@1t1u1!f_gum3z%qv*-w=3t!mc"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'backend',
+    'localhost',
+    'hseflow-krutoisashka.amvera.io',
+    'hseflowweb-krutoisashka.amvera.io',
+    'amvera-krutoisashka-cnpg-pgwebhse-rw',
+]
 
+# CORS/CSRF settings
+CORS_ALLOWED_ORIGINS = [
+    'https://hseflowweb-krutoisashka.amvera.io',
+]
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [
+    'https://hseflowweb-krutoisashka.amvera.io',
+]
 
 # Application definition
 
@@ -41,6 +56,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     'drf_spectacular',
     "users",
@@ -49,6 +65,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -88,6 +105,9 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
+        'OPTIONS': {
+            'sslmode': 'prefer',
+        },
     }
 }
 

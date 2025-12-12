@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
+import {API_BASE_URL} from "../config"
 
 export default function HomePage() {
   const [posts, setPosts] = useState([]);
@@ -11,7 +12,7 @@ export default function HomePage() {
       setError("");
       try {
         // В dev проксируется через vite.config.js на бекенд http://localhost:8000
-        const res = await fetch("/api/posts/");
+        const res = await fetch(`${API_BASE_URL}/api/posts/`);
         if (!res.ok) {
           throw new Error(`Ошибка загрузки: ${res.status}`);
         }

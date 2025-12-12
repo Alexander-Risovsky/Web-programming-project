@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import {API_BASE_URL} from "../config"
 
 export default function LeftSidebar({
   currentPath,
@@ -37,7 +38,7 @@ export default function LeftSidebar({
       const clubId = user?.orgId || user?.id;
       if (!clubId) return;
       try {
-        const res = await fetch(`/api/clubs/${clubId}/`);
+        const res = await fetch(`${API_BASE_URL}/api/clubs/${clubId}/`);
         if (!res.ok) return;
         const data = await res.json();
         setOrgInfo(data);
@@ -52,7 +53,7 @@ export default function LeftSidebar({
   useEffect(() => {
     const loadClubs = async () => {
       try {
-        const res = await fetch("/api/clubs/");
+        const res = await fetch(`${API_BASE_URL}/api/clubs/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         setClubs(Array.isArray(data) ? data : []);
@@ -82,7 +83,7 @@ export default function LeftSidebar({
       setSubsStatus(status);
       setSubsLoading(true);
       try {
-        const res = await fetch("/api/subscriptions/");
+        const res = await fetch(`${API_BASE_URL}/api/subscriptions/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         const subs = Array.isArray(data)
