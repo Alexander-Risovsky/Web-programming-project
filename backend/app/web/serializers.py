@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from web.models import (
-    Club,
     Form,
     Post,
     Registration,
@@ -12,12 +11,6 @@ from web.models import (
     RegistrationSubmission,
     Subscription,
 )
-
-
-class ClubSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Club
-        fields = "__all__"
 
 
 class FormSerializer(serializers.ModelSerializer):

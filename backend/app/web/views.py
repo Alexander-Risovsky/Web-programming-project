@@ -13,7 +13,6 @@ from web.models import (
     Subscription,
 )
 from web.serializers import (
-    ClubSerializer,
     FormSerializer,
     PostSerializer,
     RegistrationAnswerSerializer,
@@ -24,11 +23,6 @@ from web.serializers import (
     SubscriptionSerializer,
 )
 
-
-@extend_schema(tags=["Клубы"])
-class ClubViewSet(viewsets.ModelViewSet):
-    queryset = Club.objects.all()
-    serializer_class = ClubSerializer
 
 
 @extend_schema(tags=["Формы"])

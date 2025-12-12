@@ -7,9 +7,9 @@ from web.models import Club
 
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
-    fieldsets = UserAdmin.fieldsets + (("Дополнительно", {"fields": ("avatar_url", "created_at")}),)
+    fieldsets = UserAdmin.fieldsets + (("Дополнительно", {"fields": ("created_at",)}),)
     add_fieldsets = UserAdmin.add_fieldsets + ((None, {"fields": ("avatar_url",)}),)
-    list_display = ("username", "email", "avatar_url", "is_staff", "is_active")
+    list_display = ("username", "email", "is_staff", "is_active")
     search_fields = ("username", "email")
 
 @admin.register(Student)

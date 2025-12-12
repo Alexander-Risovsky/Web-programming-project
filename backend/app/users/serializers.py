@@ -55,22 +55,29 @@ class RegisterClubSerializer(serializers.Serializer):
         )
 
         club = Club.objects.create(
-            user = user,
+            user=user,
             name=validated_data["name"],
             description=validated_data.get("description", ""),
             avatar_url=validated_data.get("avatar_url", None),
         )
 
-        # attach created user to the serializer instance for view access
         self.created_user = user
         return club
 
 
 class StudentSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
-        fields = ("id", "name", "surname", "course", "group", "major")
+        fields = ("id", "name", "surname", "course", "group", "major", "avatar_url")
+
+    def get_avatar_url(self, obj):
+        request = self.context.get("request")
+        if obj.avatar_url:
+            url = obj.avatar_url.url
+            return request.build_absolute_uri(url) if request else url
+        return None
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -78,14 +85,22 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "username", "email", "avatar_url", "student_profile")
+        fields = ("id", "username", "email", "student_profile")
 
 
 class ClubSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Club
         fields = ("id", "name", "description", "avatar_url", "created_at")
 
+    def get_avatar_url(self, obj):
+        request = self.context.get("request")
+        if obj.avatar_url:
+            url = obj.avatar_url.url
+            return request.build_absolute_uri(url) if request else url
+        return None
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(required=True)

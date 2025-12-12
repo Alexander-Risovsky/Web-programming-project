@@ -200,7 +200,7 @@ export default function LeftSidebar({
                           }`}
                         />
                         <img
-                          src={`/OrganizationLogo/${org.logo || "DefaultLogo.jpg"}`}
+                         src={org.avatar_url || "/OrganizationLogo/DefaultLogo.jpg"}
                           alt={org.name}
                           className="relative z-10 object-cover rounded-md w-7 h-7"
                           onError={(e) => {
