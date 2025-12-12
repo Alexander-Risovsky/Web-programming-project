@@ -39,9 +39,11 @@ ALLOWED_HOSTS = [
 ]
 
 # CORS/CSRF settings
+# Allow explicit frontend host; allow-all as a fallback to avoid missing origins in prod.
 CORS_ALLOWED_ORIGINS = [
     'https://hseflowweb-krutoisashka.amvera.io',
 ]
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     'https://hseflowweb-krutoisashka.amvera.io',
@@ -65,7 +67,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # must be high to add CORS headers
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
