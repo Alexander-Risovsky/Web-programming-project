@@ -4,7 +4,6 @@ from django.db import models
 
 class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
-    avatar_url = models.ImageField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -23,6 +22,7 @@ class Student(models.Model):
     course = models.CharField(max_length=10, null=True, blank=True)
     group = models.CharField(max_length=100, null=True, blank=True)
     major = models.CharField(max_length=100, blank=True, null=True)
+    avatar_url = models.ImageField(upload_to="student_avatars/", blank=True, null=True)
 
     class Meta:
         db_table = "students"
