@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import {API_BASE_URL} from "../config"
+import {API_BASE_URL, buildMediaUrl} from "../config"
 
 export default function LeftSidebar({
   currentPath,
@@ -291,7 +291,7 @@ export default function LeftSidebar({
                             }`}
                         />
                         <img
-                          src={org.avatar_url || "/OrganizationLogo/DefaultLogo.jpg"}
+                          src={buildMediaUrl(org.avatar_url) || "/OrganizationLogo/DefaultLogo.jpg"}
                           alt={org.name}
                           className="relative z-10 object-cover rounded-md w-7 h-7"
                           onError={(e) => {

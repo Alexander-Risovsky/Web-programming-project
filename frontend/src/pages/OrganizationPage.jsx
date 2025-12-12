@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import {API_BASE_URL} from "../config"
+import { API_BASE_URL, buildMediaUrl } from "../config";
+import {API_BASE_URL, buildMediaUrl} from "../config"
 export default function OrganizationPage() {
   const { orgId } = useParams();
   const { user } = useAuth();
@@ -174,7 +175,7 @@ export default function OrganizationPage() {
     <section className="max-w-5xl mx-auto space-y-5">
       <div className="flex flex-col items-center gap-5 p-6 glass-card lg:p-8 sm:flex-row sm:items-start">
         <img
-          src={club.avatar_url || "/OrganizationLogo/DefaultLogo.jpg"}
+          src={buildMediaUrl(club.avatar_url) || "/OrganizationLogo/DefaultLogo.jpg"}
           alt={club.name}
           className="object-cover w-24 h-24 border shadow-md rounded-2xl border-slate-200"
           onError={(e) => {
@@ -239,7 +240,7 @@ export default function OrganizationPage() {
               <p className="mb-3 text-slate-700">{post.content}</p>
               {post.image_url && (
                 <img
-                  src={post.image_url}
+                  src={buildMediaUrl(post.image_url) || post.image_url}
                   alt={post.title}
                   className="object-cover w-full mb-3 h-60 rounded-xl"
                 />
