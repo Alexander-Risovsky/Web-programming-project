@@ -1,0 +1,64 @@
+name: Deploy to Amvera
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - master
+
+jobs:
+  changes:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+
+  deploy-backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: master
+      
+      - name: Deploy Backend to Amvera
+        env:
+          AMVERA_TOKEN: ${{ secrets.AMVIRA_SECRET }}
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+          git remote add amvera-backend https://oauth2:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflow.git
+          git subtree push --prefix=backend amvera-backend master
+
+  deploy-frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: master
+      
+      - name: Deploy Frontend to Amvera
+        env:
+          AMVERA_TOKEN: ${{ secrets.AMVIRA_SECRET }}
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+          git remote add amvera-frontend https://oauth2:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflowweb.git
+          git subtree push --prefix=frontend amvera-frontend master

@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, buildMediaUrl } from "../config";
-import {API_BASE_URL, buildMediaUrl} from "../config"
 export default function OrganizationPage() {
   const { orgId } = useParams();
   const { user } = useAuth();
