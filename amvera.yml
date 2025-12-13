@@ -1,0 +1,12 @@
+# build:
+#   dockerfile: backend/Dockerfile
+
+# run:
+#   containerPort: 8000        
+#   persistenceMount: /data
+
+# front
+build:
+  dockerfile: frontend/Dockerfile
+args:
+    VITE_BACKEND_URL: https://hseflow-krutoisashka.amvera.io
