@@ -39,10 +39,7 @@ jobs:
         env:
           AMVERA_TOKEN: ${{ secrets.AMVIRA_SECRET }}
         run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "GitHub Actions"
-          git remote add prod-b https://oauth2:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflow.git || true
-          git subtree push --prefix=backend prod-b master
+          git push prod-b master
 
   deploy-frontend:
     needs: changes
@@ -58,7 +55,4 @@ jobs:
         env:
           AMVERA_TOKEN: ${{ secrets.AMVIRA_SECRET }}
         run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "GitHub Actions"
-          git remote add prod-f https://oauth2:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflowweb.git || true
-          git subtree push --prefix=frontend prod-f master
+          git push prod-f master
