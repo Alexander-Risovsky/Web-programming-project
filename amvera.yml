@@ -1,0 +1,7 @@
+build:
+  dockerfile: backend/Dockerfile
+  context: backend/
+
+run:
+  containerPort: 8000        
+  persistenceMount: /data
