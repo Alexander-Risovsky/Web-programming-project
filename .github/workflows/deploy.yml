@@ -41,8 +41,8 @@ jobs:
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "GitHub Actions"
-          git remote add amvera-backend https://oauth2:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflow.git
-          git subtree push --prefix=backend amvera-backend master
+          git remote add prod-b https://oauth2:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflow.git || true
+          git subtree push --prefix=backend prod-b master
 
   deploy-frontend:
     needs: changes
@@ -60,5 +60,5 @@ jobs:
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "GitHub Actions"
-          git remote add amvera-frontend https://oauth2:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflowweb.git
-          git subtree push --prefix=frontend amvera-frontend master
+          git remote add prod-f https://oauth2:${AMVERA_TOKEN}@git.msk0.amvera.ru/krutoisashka/hseflowweb.git || true
+          git subtree push --prefix=frontend prod-f master
