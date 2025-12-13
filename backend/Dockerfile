@@ -9,9 +9,12 @@ RUN apt-get update && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Копируем requirements из КОРНЯ проекта (где amvera.yml)
+# Копируем requirements из КОРНЯ проекта (где amvera.yml)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Копируем папку app из backend/
+COPY backend/app/ ./app/
 # Копируем папку app из backend/
 COPY backend/app/ ./app/
 
