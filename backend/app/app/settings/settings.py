@@ -28,7 +28,8 @@ SECRET_KEY = "django-insecure-98_lk+4f9g$yv*(n38_yis31@1t1u1!f_gum3z%qv*-w=3t!mc
 
 # SECURITY WARNING: don't run with debug turned on in production!
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = os.getenv('DEBUG', 'False') == 'True' #ДЛЯ ПРОДА
+# DEBUG = True # ДЛЯ ЛОКАЛ 
 
 ALLOWED_HOSTS = [
     'backend',
@@ -36,6 +37,7 @@ ALLOWED_HOSTS = [
     'hseflow-krutoisashka.amvera.io',
     'hseflowweb-krutoisashka.amvera.io',
     'amvera-krutoisashka-cnpg-pgwebhse-rw',
+    "127.0.0.1",
 ]
 
 # CORS/CSRF settings
@@ -152,7 +154,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = "/data/media"

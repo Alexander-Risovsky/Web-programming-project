@@ -5,7 +5,7 @@ import React, {
   useState,
   useEffect,
 } from "react";
-import {API_BASE_URL} from "../config"
+import { API_BASE_URL } from "../config";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -49,6 +49,7 @@ export function AuthProvider({ children }) {
       let data = null;
       if (contentType.toLowerCase().includes("application/json")) {
         data = await res.json();
+        console.log(data);
       } else {
         const text = await res.text();
         throw new Error(text || "Сервер вернул ответ в неизвестном формате");
@@ -61,19 +62,25 @@ export function AuthProvider({ children }) {
       }
 
       const userData = data?.student || data || {};
-      console.log("Logged in student:", userData,data);
+      // console.log("Logged in student:", userData, data);
 
       setUser({
         id: userData.id,
-        username: userData.username,
-        email: userData.email,
+        username: userData.user_username,
+        name: userData.name,
+        surname: userData.surname,
+        course: userData.course,
+        group: userData.group,
+        major: userData.major,
+        email: userData.user_email,
         avatarUrl: userData.avatar_url,
         role: "student",
         orgId: null,
-        studentProfile: userData.student_profile,
+        // studentProfile: userData.student_profile,
         access: data?.access,
         refresh: data?.refresh,
       });
+      console.log(user);
 
       return { success: true };
     } catch (err) {
@@ -91,7 +98,7 @@ export function AuthProvider({ children }) {
         password: password || "",
       };
 
-      const res = await fetch(`${API_BASE_URL}/api/auth/login/`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login-club/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -108,12 +115,16 @@ export function AuthProvider({ children }) {
         );
       }
 
-      const orgData = data?.user || data || {};
+      const orgData = data?.club || data || {};
+      console.log("orgData: ");
+      console.log(orgData);
 
       setUser({
         id: orgData.id,
         username: orgData.username,
+        name: orgData.name,
         email: orgData.email,
+        description: orgData.description,
         avatarUrl: orgData.avatar_url,
         role: "org",
         orgId: orgData.id,
@@ -121,7 +132,8 @@ export function AuthProvider({ children }) {
         access: data?.access,
         refresh: data?.refresh,
       });
-
+      console.log("user: ");
+      console.log(user);
       return { success: true };
     } catch (err) {
       return {

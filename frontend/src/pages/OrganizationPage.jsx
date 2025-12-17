@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, buildMediaUrl } from "../config";
@@ -15,6 +16,13 @@ export default function OrganizationPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [notifyOn, setNotifyOn] = useState(false);
+  const [formFields, setFormFields] = useState([]);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [answers, setAnswers] = useState({});
+  const [formId, setFormId] = useState(null);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [toast, setToast] = useState(null);
 
   // загрузка клуба
   useEffect(() => {
@@ -104,20 +112,157 @@ export default function OrganizationPage() {
     email: user?.email || "",
   };
 
+  const getFieldOptions = (field) => {
+    if (!field?.options) return [];
+    try {
+      const parsed = JSON.parse(field.options);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      // ignore parse errors, fall back to comma split
+    }
+    return field.options
+      .split(",")
+      .map((opt) => opt.trim())
+      .filter(Boolean);
+  };
+
+  const loadFormForPost = async (postId) => {
+    setFormLoading(true);
+    setFormError("");
+    try {
+      const formsRes = await fetch(`${API_BASE_URL}/api/registration-forms/`);
+      const formsData = await formsRes.json().catch(() => null);
+      const form = Array.isArray(formsData)
+        ? formsData.find((f) => f.post === postId)
+        : null;
+
+      if (!form?.id) {
+        setFormId(null);
+        setFormFields([]);
+        setFormError("Для этого поста форма регистрации не настроена");
+      } else {
+        setFormId(form.id);
+
+        const fieldsRes = await fetch(`${API_BASE_URL}/api/registration-fields/`);
+        const fieldsData = await fieldsRes.json().catch(() => null);
+        const fields = Array.isArray(fieldsData)
+          ? fieldsData
+              .filter((f) => f.form === form.id)
+              .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+          : [];
+
+        setFormFields(fields);
+        const initialAnswers = {};
+        fields.forEach((f) => {
+          initialAnswers[f.id] = "";
+        });
+        setAnswers(initialAnswers);
+      }
+    } catch (err) {
+      console.error(err);
+      setFormId(null);
+      setFormFields([]);
+      setFormError("Не удалось загрузить форму регистрации");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleAnswerChange = (fieldId, value) => {
+    setAnswers((prev) => ({ ...prev, [fieldId]: value }));
+  };
+
   const openModal = (post) => {
     setSelectedPost(post);
+    setFormFields([]);
+    setAnswers({});
+    setFormError("");
+    setFormId(null);
     setModalOpen(true);
+    if (post?.id) {
+      loadFormForPost(post.id);
+    }
   };
 
   const closeModal = () => {
     setSelectedPost(null);
     setModalOpen(false);
+    setFormFields([]);
+    setAnswers({});
+    setFormError("");
+    setFormId(null);
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    // TODO: отправить регистрацию на мероприятие
-    closeModal();
+    if (!selectedPost || !formId || !user?.id) {
+      setFormError("Форма недоступна для отправки");
+      return;
+    }
+
+    setSubmitLoading(true);
+    setFormError("");
+
+    try {
+      const baseHeaders = {
+        "Content-Type": "application/json",
+        ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),
+      };
+
+      const submissionRes = await fetch(
+        `${API_BASE_URL}/api/registration-submissions/`,
+        {
+          method: "POST",
+          headers: baseHeaders,
+          credentials: "include",
+          body: JSON.stringify({ user: user.id, form: formId }),
+        }
+      );
+      const submissionData = await submissionRes.json().catch(() => null);
+      if (!submissionRes.ok) {
+        throw new Error(
+          submissionData?.detail || "Не удалось отправить заявку"
+        );
+      }
+
+      const submissionId = submissionData?.id;
+
+      for (const field of formFields) {
+        const value = answers[field.id] ?? "";
+        const answerRes = await fetch(
+          `${API_BASE_URL}/api/registration-answers/`,
+          {
+            method: "POST",
+            headers: baseHeaders,
+            credentials: "include",
+            body: JSON.stringify({
+              value_text: value?.toString() ?? "",
+              submission: submissionId,
+              field: field.id,
+            }),
+          }
+        );
+        const answerData = await answerRes.json().catch(() => null);
+        if (!answerRes.ok) {
+          throw new Error(
+            answerData?.detail || "Не удалось сохранить ответы формы"
+          );
+        }
+      }
+
+      closeModal();
+      setToast({ type: "success", message: "Регистрация на мероприятие успешна" });
+      setTimeout(() => setToast(null), 3500);
+    } catch (err) {
+      setFormError(err.message || "Не удалось отправить заявку");
+      setToast({
+        type: "error",
+        message: "Не удалось подписаться на организацию",
+      });
+      setTimeout(() => setToast(null), 3500);
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
   const handleSubscribeToggle = async () => {
@@ -171,7 +316,22 @@ export default function OrganizationPage() {
   }
 
   return (
-    <section className="max-w-5xl mx-auto space-y-5">
+    <>
+      {toast &&
+        createPortal(
+          <div className="fixed inset-x-0 top-3 z-[12000] flex justify-center pointer-events-none animate-slide-up">
+            <div
+              className={`px-5 py-3 rounded-xl shadow-lg text-white pointer-events-auto ${
+                toast.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+              }`}
+            >
+              {toast.message}
+            </div>
+          </div>,
+          document.body
+        )}
+
+      <section className="max-w-5xl mx-auto space-y-5">
       <div className="flex flex-col items-center gap-5 p-6 glass-card lg:p-8 sm:flex-row sm:items-start">
         <img
           src={buildMediaUrl(club.avatar_url) || "/OrganizationLogo/DefaultLogo.jpg"}
@@ -186,31 +346,31 @@ export default function OrganizationPage() {
           <p className="text-sm font-semibold text-primary">Организация</p>
           <h1 className="text-3xl font-bold text-slate-900">{club.name}</h1>
           <p className="text-slate-600">{club.description}</p>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleSubscribeToggle}
-              disabled={subsLoading || user?.role !== "student"}
-              className={`px-4 py-2.5 rounded-xl font-semibold transition-all duration-300 shadow-lg ${
-                subscriptionId
-                  ? "border-2 border-primary text-primary bg-white hover:bg-primary/5"
-                  : "bg-gradient-to-r from-primary via-purple-600 to-indigo-600 text-white hover:shadow-xl hover:scale-[1.02]"
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {subscriptionId ? "Отписаться" : "Подписаться"}
-            </button>
-            <button
-              onClick={() => setNotifyOn((v) => !v)}
-              className={`px-4 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
-                notifyOn
-                  ? "bg-white/90 border-2 border-primary/40 text-primary hover:bg-primary/5"
-                  : " border-2 text-slate-600 bg-slate-100 border-slate-200 hover:bg-slate-200"
-              }`}
-            >
-              {notifyOn
-                ? "Уведомления включены"
-                : "Включить уведомления"}
-            </button>
-          </div>
+          {user?.role !== "org" && (
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleSubscribeToggle}
+                disabled={subsLoading || user?.role !== "student"}
+                className={`px-4 py-2.5 rounded-xl font-semibold transition-all duration-300 shadow-lg ${
+                  subscriptionId
+                    ? "border-2 border-primary text-primary bg-white hover:bg-primary/5"
+                    : "bg-gradient-to-r from-primary via-purple-600 to-indigo-600 text-white hover:shadow-xl hover:scale-[1.02]"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {subscriptionId ? "Отписаться" : "Подписаться"}
+              </button>
+              <button
+                onClick={() => setNotifyOn((v) => !v)}
+                className={`px-4 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                  notifyOn
+                    ? "bg-white/90 border-2 border-primary/40 text-primary hover:bg-primary/5"
+                    : " border-2 text-slate-600 bg-slate-100 border-slate-200 hover:bg-slate-200"
+                }`}
+              >
+                {notifyOn ? "Уведомления включены" : "Включить уведомления"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -266,97 +426,104 @@ export default function OrganizationPage() {
         </div>
       )}
 
-      {modalOpen && selectedPost && (
-        <div
-          className="fixed inset-0 -inset-6 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
-          onClick={closeModal}
-        >
+      {modalOpen && selectedPost &&
+        createPortal(
           <div
-            className="relative w-full max-w-md p-6 bg-white shadow-2xl rounded-2xl animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 w-screen h-screen"
+            onClick={closeModal}
           >
-            <h3 className="mb-2 text-xl font-bold text-slate-900">
-              Регистрация на мероприятие
-            </h3>
-            <p className="mb-4 text-sm text-slate-600">{selectedPost.title}</p>
+            <div
+              className="relative w-full max-w-md p-6 bg-white shadow-2xl rounded-2xl animate-slide-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="mb-2 text-xl font-bold text-slate-900">
+                Регистрация на мероприятие
+              </h3>
+              <p className="mb-4 text-sm text-slate-600">{selectedPost.title}</p>
 
-            <form className="space-y-3" onSubmit={handleRegister}>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">
-                  Имя
-                </label>
-                <input
-                  type="text"
-                  value={currentUser.name}
-                  readOnly
-                  className="w-full px-3 py-2 border-2 rounded-lg border-slate-200 bg-slate-50 text-slate-800"
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">
-                    Группа
-                  </label>
-                  <input
-                    type="text"
-                    value={currentUser.group}
-                    readOnly
-                    className="w-full px-3 py-2 border-2 rounded-lg border-slate-200 bg-slate-50 text-slate-800"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">
-                    Курс
-                  </label>
-                  <input
-                    type="text"
-                    value={currentUser.course}
-                    readOnly
-                    className="w-full px-3 py-2 border-2 rounded-lg border-slate-200 bg-slate-50 text-slate-800"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">
-                  E-mail
-                </label>
-                <input
-                  type="email"
-                  value={currentUser.email}
-                  readOnly
-                  className="w-full px-3 py-2 border-2 rounded-lg border-slate-200 bg-slate-50 text-slate-800"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">
-                  Комментарий (по желанию)
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full px-3 py-2 border-2 rounded-lg border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  placeholder="Напишите, если есть пожелания..."
-                />
-              </div>
+              <form className="space-y-3" onSubmit={handleRegister}>
+                {formLoading ? (
+                  <p className="text-sm text-slate-600">Загружаем вопросы формы...</p>
+                ) : formError ? (
+                  <div className="p-3 text-sm text-rose-600 bg-rose-50 rounded-lg border border-rose-200">
+                    {formError}
+                  </div>
+                ) : formFields.length === 0 ? (
+                  <p className="text-sm text-slate-600">
+                    Форма регистрации пока не заполнена.
+                  </p>
+                ) : (
+                  formFields.map((field) => {
+                    const options = getFieldOptions(field);
+                    const inputType =
+                      field.field_type === "number"
+                        ? "number"
+                        : field.field_type === "date"
+                        ? "date"
+                        : field.field_type === "email"
+                        ? "email"
+                        : field.field_type === "phone"
+                        ? "tel"
+                        : "text";
+                    return (
+                      <div key={field.id} className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-600">
+                          {field.label} {field.is_required ? "*" : ""}
+                        </label>
+                        {field.field_type === "select" ? (
+                          <select
+                            value={answers[field.id] ?? ""}
+                            onChange={(e) =>
+                              handleAnswerChange(field.id, e.target.value)
+                            }
+                            required={!!field.is_required}
+                            className="w-full px-3 py-2 border-2 rounded-lg border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                          >
+                            <option value="">Выберите вариант</option>
+                            {options.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type={inputType}
+                            value={answers[field.id] ?? ""}
+                            onChange={(e) =>
+                              handleAnswerChange(field.id, e.target.value)
+                            }
+                            required={!!field.is_required}
+                            className="w-full px-3 py-2 border-2 rounded-lg border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                          />
+                        )}
+                      </div>
+                    );
+                  })
+                )}
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 text-sm font-semibold transition border text-slate-600 rounded-xl bg-slate-100 border-slate-200 hover:bg-slate-200"
-                >
-                  Закрыть
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all"
-                >
-                  Зарегистрироваться
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-2 text-sm font-semibold transition border text-slate-600 rounded-xl bg-slate-100 border-slate-200 hover:bg-slate-200"
+                  >
+                    Закрыть
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitLoading || formLoading || !!formError || !formId}
+                    className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submitLoading ? "Отправляем..." : "Зарегистрироваться"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
     </section>
+    </>
   );
 }

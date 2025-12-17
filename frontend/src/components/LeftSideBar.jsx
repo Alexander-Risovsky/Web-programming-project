@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import {API_BASE_URL, buildMediaUrl} from "../config"
+import { API_BASE_URL, buildMediaUrl } from "../config";
 
 export default function LeftSidebar({
   currentPath,
@@ -276,7 +276,7 @@ export default function LeftSidebar({
                     >
                       <div
                         className={`
-                          flex items-center justify-center mr-3 rounded-lg p-0 relative transition-all duration-300
+                          flex items-center justify-center mr-3 rounded-full p-0 relative transition-all duration-300
                           ${
                             isActive
                               ? "bg-white/20 shadow-lg"
@@ -286,14 +286,17 @@ export default function LeftSidebar({
                       >
                         <div
                           className={`
-                            absolute inset-0 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm ${
+                            absolute inset-0 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm ${
                               isActive ? "opacity-100" : ""
                             }`}
                         />
                         <img
-                          src={buildMediaUrl(org.avatar_url) || "/OrganizationLogo/DefaultLogo.jpg"}
+                          src={
+                            buildMediaUrl(org.avatar_url) ||
+                            "/OrganizationLogo/DefaultLogo.jpg"
+                          }
                           alt={org.name}
-                          className="relative z-10 object-cover rounded-md w-7 h-7"
+                          className="relative z-10 object-cover rounded-full w-7 h-7"
                           onError={(e) => {
                             e.target.onerror = null;
                             e.target.src = "/OrganizationLogo/DefaultLogo.jpg";
@@ -343,9 +346,9 @@ export default function LeftSidebar({
             <span className="text-sm font-semibold leading-tight truncate transition-colors duration-300 text-slate-800 group-hover:text-primary">
               {isOrg
                 ? orgName
-                : `${user?.studentProfile?.name || ""} ${
-                    user?.studentProfile?.surname || ""
-                  }`.trim() || user?.username || "Пользователь"}
+                : `${user?.name || ""} ${user?.surname || ""}`.trim() ||
+                  user?.username ||
+                  "Пользователь"}
             </span>
             <span className="text-xs leading-tight truncate text-slate-500">
               {isOrg ? "Организация" : "Студент"}
