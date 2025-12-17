@@ -1,23 +1,27 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-export default defineConfig({
-  server: {
-    host: "0.0.0.0",
-    port: 5173, // было 80 для прода
-    strictPort: true,
-    proxy: {
-      "/api": {
-        //target: "https:hseflow-krutoisashka.amvera.io",
-        target: "http://localhost:8000",
-        changeOrigin: true,
-        secure: true,
-      },
-      "/media": {
-        //target: "https:hseflow-krutoisashka.amvera.io",
-        target: "http://localhost:8000",
-        changeOrigin: true,
-        secure: true,
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const proxyTarget = env.VITE_PROXY_TARGET || "http://localhost:8000";
+  const port = env.VITE_PORT || 5173;
+
+  return {
+    server: {
+      host: "0.0.0.0",
+      port: port,
+      strictPort: true,
+      proxy: {
+        "/api": {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: true,
+        },
+        "/media": {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: true,
+        },
       },
     },
-  },
+  };
 });
