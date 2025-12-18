@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   createBrowserRouter,
   RouterProvider,
   Navigate,
+  useLocation,
+  useNavigate,
 } from "react-router-dom";
 import Layout from "./components/Layout";
 import HomePage from "./pages/HomePage";
@@ -26,10 +28,39 @@ function ProtectedRoute({ children, allowRole }) {
   return children;
 }
 
+function FirstVisitGuard({ children }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    try {
+      const hasVisited = localStorage.getItem("hasVisited");
+      const isAuthPage =
+        location.pathname.startsWith("/login") ||
+        location.pathname.startsWith("/register") ||
+        location.pathname.startsWith("/org/login") ||
+        location.pathname.startsWith("/org/register");
+
+      if (!hasVisited && !isAuthPage) {
+        localStorage.setItem("hasVisited", "true");
+        navigate("/register", { replace: true });
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [location.pathname, navigate]);
+
+  return children;
+}
+
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Layout />,
+    element: (
+      <FirstVisitGuard>
+        <Layout />
+      </FirstVisitGuard>
+    ),
     children: [
       { index: true, element: <HomePage /> },
       { path: "welcome", element: <WelcomePage /> },
