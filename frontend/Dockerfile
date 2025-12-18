@@ -2,19 +2,12 @@ FROM node:22-bullseye-slim
 
 WORKDIR /app
 
-# Копируем package.json и package-lock.json
-COPY package*.json ./
-
-# Устанавливаем зависимости
+COPY frontend/package*.json ./
 RUN npm install --legacy-peer-deps
 
-# Копируем остальной фронт
-COPY . .
-
-# Собираем production build
+COPY frontend/ .
 RUN npm run build
 
-# Устанавливаем serve для production
 RUN npm install -g serve
 
 # Amvera ожидает порт 80
