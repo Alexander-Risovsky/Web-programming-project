@@ -3,7 +3,7 @@ const envBase = import.meta.env?.VITE_BACKEND_URL;
 export const API_BASE_URL =
   envBase && !envBase.includes("__VITE_BACKEND_URL__")
     ? envBase
-    : "http://localhost:8000";
+    : "https://hseflow-krutoisashka.amvera.io";
 
 export const buildMediaUrl = (path) => {
   if (!path) return null;
