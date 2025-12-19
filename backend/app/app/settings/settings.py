@@ -44,11 +44,13 @@ ALLOWED_HOSTS = [
 # Allow explicit frontend host; allow-all as a fallback to avoid missing origins in prod.
 CORS_ALLOWED_ORIGINS = [
     'https://hseflowweb-krutoisashka.amvera.io',
+    'https://hseflow-krutoisashka.amvera.io',
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     'https://hseflowweb-krutoisashka.amvera.io',
+    'https://hseflow-krutoisashka.amvera.io',
 ]
 
 # Application definition
@@ -155,7 +157,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "/static/"
-STATIC_ROOT = " data/staticfiles"
+STATIC_ROOT = "/data/staticfiles"
 
 
 MEDIA_URL = "/media/"
