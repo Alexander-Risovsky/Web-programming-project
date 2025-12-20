@@ -11,14 +11,17 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
+import importlib.util
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # One level up from the Django package so it aligns with manage.py/media/staticfiles.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Load env from backend/.env when running from repo root.
+load_dotenv(dotenv_path=BASE_DIR.parent / ".env", override=False)
+load_dotenv(override=False)
 
 
 # Quick-start development settings - unsuitable for production
@@ -133,6 +136,46 @@ STATIC_URL = "static/"
 
 MEDIA_URL = "/media/"
 
+# S3 (S3-compatible, e.g. reg.ru). Enabled via env to keep local dev simple.
+USE_S3 = os.getenv("S3_ENABLED", "0") in {"1", "true", "True", "yes", "on"}
+
+if USE_S3:
+    _storages_available = importlib.util.find_spec("storages") is not None
+    _boto3_available = importlib.util.find_spec("boto3") is not None
+    if not (_storages_available and _boto3_available):
+        USE_S3 = False
+
+if USE_S3:
+    AWS_ACCESS_KEY_ID = os.getenv("S3_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("S3_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.getenv("S3_BUCKET") or os.getenv("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
+    AWS_S3_REGION_NAME = os.getenv("S3_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
+
+    AWS_S3_ADDRESSING_STYLE = os.getenv("S3_ADDRESSING_STYLE", "path")
+    AWS_S3_SIGNATURE_VERSION = os.getenv("S3_SIGNATURE_VERSION", "s3v4")
+
+    _s3_verify = (os.getenv("S3_VERIFY") or "").strip()
+    if _s3_verify.lower() in {"0", "false", "no", "off"}:
+        AWS_S3_VERIFY = False
+    elif _s3_verify:
+        AWS_S3_VERIFY = _s3_verify
+
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = os.getenv("S3_QUERYSTRING_AUTH", "1") not in {"0", "false", "False", "no", "off"}
+    AWS_S3_FILE_OVERWRITE = False
+
+    # Use the "website" domain only for public objects (unsigned URLs).
+    S3_CUSTOM_DOMAIN = os.getenv("S3_CUSTOM_DOMAIN")
+    if S3_CUSTOM_DOMAIN and not AWS_QUERYSTRING_AUTH:
+        AWS_S3_CUSTOM_DOMAIN = S3_CUSTOM_DOMAIN
+
+    INSTALLED_APPS += ["storages"]
+    STORAGES = {
+        "default": {"BACKEND": "storages.backends.s3boto3.S3Boto3Storage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -149,8 +192,12 @@ from datetime import timedelta
 
 REST_FRAMEWORK.update({
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        ('rest_framework_simplejwt.authentication.JWTAuthentication',)
+        + (
+            ('rest_framework.authentication.SessionAuthentication',)
+            if DEBUG
+            else tuple()
+        )
     ),
 })
 

@@ -41,6 +41,7 @@ class Post(models.Model):
     type = models.CharField(max_length=50, blank=True)
     title = models.CharField(max_length=255)
     content = models.TextField()
+    image = models.ImageField(upload_to="post_images/", blank=True, null=True)
     image_url = models.URLField(blank=True)
     is_form = models.BooleanField(default=False)
     form = models.OneToOneField(
@@ -91,6 +92,7 @@ class RegistrationField(models.Model):
     is_required = models.BooleanField(default=False)
     sort_order = models.PositiveIntegerField(default=0)
     options = models.JSONField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "registration_fields"
@@ -163,6 +165,7 @@ class Subscription(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="subscriptions"
     )
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="subscriptions")
+    notifications_enabled = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -173,3 +176,25 @@ class Subscription(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user_id} -> клуб {self.club_id}"
+
+
+class Notification(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications"
+    )
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="notifications")
+    post = models.ForeignKey(
+        Post, on_delete=models.CASCADE, related_name="notifications"
+    )
+    text = models.CharField(max_length=500, blank=True)
+    is_new = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "notifications"
+        verbose_name = "Уведомление"
+        verbose_name_plural = "Уведомления"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Notification {self.id} to user {self.user_id}"

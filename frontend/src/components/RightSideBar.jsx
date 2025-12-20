@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, buildMediaUrl } from "../config";
+import { dedupFetch } from "../utils/dedupFetch";
 const events = [
   {
     id: 1,
@@ -21,13 +22,14 @@ const events = [
 ];
 
 export default function RightSidebar() {
-  const { user } = useAuth();
+  const { user, authFetch } = useAuth();
   const isOrg = user?.role === "org";
   const isStudent = user?.role === "student";
   const [clubs, setClubs] = useState([]);
   const [clubsLoading, setClubsLoading] = useState(false);
   const [subscriptions, setSubscriptions] = useState([]);
   const [subsVersion, setSubsVersion] = useState(0);
+  const [registrationsVersion, setRegistrationsVersion] = useState(0);
   const [loadingSub, setLoadingSub] = useState(false);
   const [orgEvents, setOrgEvents] = useState([]);
   const [orgEventsLoading, setOrgEventsLoading] = useState(false);
@@ -38,7 +40,7 @@ export default function RightSidebar() {
     const loadClubs = async () => {
       setClubsLoading(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/clubs/`);
+        const res = await dedupFetch(`${API_BASE_URL}/api/clubs/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         setClubs(Array.isArray(data) ? data : []);
@@ -53,24 +55,23 @@ export default function RightSidebar() {
 
   useEffect(() => {
     const loadSubs = async () => {
-      if (!isStudent || !user?.id) {
+      if (!isStudent || !user?.access) {
         setSubscriptions([]);
         return;
       }
       try {
-        const res = await fetch(`${API_BASE_URL}/api/subscriptions/`);
+        const res = await authFetch(`${API_BASE_URL}/api/subscriptions/`, {
+          credentials: "include",
+        });
         if (!res.ok) throw new Error();
         const data = await res.json();
-        const subs = Array.isArray(data)
-          ? data.filter((s) => s.user === user.id)
-          : [];
-        setSubscriptions(subs);
+        setSubscriptions(Array.isArray(data) ? data : []);
       } catch {
         setSubscriptions([]);
       }
     };
     loadSubs();
-  }, [isStudent, user, subsVersion]);
+  }, [isStudent, user?.access, subsVersion, authFetch]);
 
   useEffect(() => {
     const handler = () => setSubsVersion((v) => v + 1);
@@ -79,31 +80,35 @@ export default function RightSidebar() {
   }, []);
 
   useEffect(() => {
+    const handler = () => setRegistrationsVersion((v) => v + 1);
+    window.addEventListener("registrations-updated", handler);
+    return () =>
+      window.removeEventListener("registrations-updated", handler);
+  }, []);
+
+  useEffect(() => {
     const loadStudentEvents = async () => {
-      if (!isStudent || !user?.id) {
+      const authUserId = user?.userId ?? user?.id;
+      if (!isStudent || !authUserId) {
         setStudentEvents([]);
         return;
       }
       setStudentEventsLoading(true);
       try {
-        const baseHeaders = {
-          ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),
-        };
-        const subsRes = await fetch(
+        const subsRes = await authFetch(
           `${API_BASE_URL}/api/registration-submissions/`,
-          { headers: baseHeaders, credentials: "include" }
+          { credentials: "include" }
         );
         const submissions = await subsRes.json().catch(() => []);
         const userSubs = Array.isArray(submissions)
-          ? submissions.filter((s) => s.user === user.id)
+          ? submissions.filter((s) => s.user === authUserId)
           : [];
         if (userSubs.length === 0) {
           setStudentEvents([]);
           return;
         }
 
-        const formsRes = await fetch(`${API_BASE_URL}/api/registration-forms/`, {
-          headers: baseHeaders,
+        const formsRes = await authFetch(`${API_BASE_URL}/api/registration-forms/`, {
           credentials: "include",
         });
         const forms = await formsRes.json().catch(() => []);
@@ -119,8 +124,7 @@ export default function RightSidebar() {
           return;
         }
 
-        const postsRes = await fetch(`${API_BASE_URL}/api/posts/`, {
-          headers: baseHeaders,
+        const postsRes = await authFetch(`${API_BASE_URL}/api/posts/`, {
           credentials: "include",
         });
         const postsData = await postsRes.json().catch(() => []);
@@ -143,7 +147,7 @@ export default function RightSidebar() {
       }
     };
     loadStudentEvents();
-  }, [isStudent, user]);
+  }, [isStudent, user?.userId, user?.id, user?.access, registrationsVersion, authFetch]);
 
   useEffect(() => {
     const loadOrgEvents = async () => {
@@ -153,24 +157,13 @@ export default function RightSidebar() {
       }
       setOrgEventsLoading(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/posts/`);
+        const clubId = user?.orgId || user?.id;
+        const res = await dedupFetch(
+          `${API_BASE_URL}/api/posts/?club=${clubId}&event_like=1&limit=2`
+        );
         if (!res.ok) throw new Error();
         const data = await res.json();
-        const filtered = Array.isArray(data)
-          ? data
-              .filter(
-                (p) =>
-                  (p.club === (user.orgId || user.id)) &&
-                  (p.type === "event" || p.is_form)
-              )
-              .sort(
-                (a, b) =>
-                  new Date(b.published_at || b.date || 0) -
-                  new Date(a.published_at || a.date || 0)
-              )
-              .slice(0, 2)
-          : [];
-        setOrgEvents(filtered);
+        setOrgEvents(Array.isArray(data) ? data : []);
       } catch {
         setOrgEvents([]);
       } finally {
@@ -178,19 +171,20 @@ export default function RightSidebar() {
       }
     };
     loadOrgEvents();
-  }, [isOrg, user]);
+  }, [isOrg, user?.orgId, user?.id]);
 
   const subscribedIds = subscriptions.map((s) => s.club);
   const recommendations = clubs.filter((c) => !subscribedIds.includes(c.id));
 
   const handleSubscribe = async (clubId) => {
-    if (!isStudent || !user?.id || loadingSub) return;
+    if (!isStudent || !user?.access || loadingSub) return;
     setLoadingSub(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/subscriptions/`, {
+      const res = await authFetch(`${API_BASE_URL}/api/subscriptions/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: user.id, club: clubId }),
+        credentials: "include",
+        body: JSON.stringify({ club: clubId }),
       });
       let data = null;
       try {
@@ -203,7 +197,7 @@ export default function RightSidebar() {
       const newSub =
         data && data.id
           ? data
-          : { id: Date.now(), user: user.id, club: clubId };
+          : { id: Date.now(), club: clubId };
       setSubscriptions((prev) => [...prev, newSub]);
       window.dispatchEvent(new Event("subscriptions-updated"));
     } catch (err) {
@@ -239,9 +233,14 @@ export default function RightSidebar() {
                     className="overflow-hidden border shadow-sm bg-white/90 rounded-xl border-slate-200 animate-slide-up hover:shadow-md transition"
                     style={{ animationDelay: `${idx * 80}ms` }}
                   >
-                    {event.image_url && (
+                    {(event.image_url || event.image) && (
                       <img
-                        src={buildMediaUrl(event.image_url) || event.image_url}
+                        src={
+                          buildMediaUrl(event.image_url) ||
+                          buildMediaUrl(event.image) ||
+                          event.image_url ||
+                          event.image
+                        }
                         alt={event.title}
                         className="object-cover w-full h-28"
                       />
@@ -273,9 +272,14 @@ export default function RightSidebar() {
                   className="overflow-hidden border shadow-sm bg-white/90 rounded-xl border-slate-200 animate-slide-up hover:shadow-md transition"
                   style={{ animationDelay: `${idx * 80}ms` }}
                 >
-                  {event.image_url && (
+                  {(event.image_url || event.image) && (
                     <img
-                      src={buildMediaUrl(event.image_url) || event.image_url}
+                      src={
+                        buildMediaUrl(event.image_url) ||
+                        buildMediaUrl(event.image) ||
+                        event.image_url ||
+                        event.image
+                      }
                       alt={event.title}
                       className="object-cover w-full h-28"
                     />

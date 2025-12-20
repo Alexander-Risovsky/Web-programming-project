@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, Link } from "react-router-dom";
 import LeftSidebar from "./LeftSideBar";
 import RightSidebar from "./RightSideBar";
-import { organizations } from "../data/mockOrgsAndPosts";
+import { buildMediaUrl, API_BASE_URL } from "../config";
 import { useAuth } from "../context/AuthContext";
 
 export default function Layout() {
@@ -10,28 +10,52 @@ export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
-  const { user, isOrg } = useAuth();
+  const { user, isOrg, logout, authFetch } = useAuth();
+  const [notifications, setNotifications] = useState([]);
 
-  const notifications = [
-    {
-      id: 1,
-      orgId: 1,
-      text: "Новый пост: мероприятие в эти выходные. Подробнее в ленте.",
-      isNew: true,
-    },
-    {
-      id: 2,
-      orgId: 3,
-      text: "Сбор волонтёров на благотворительную ярмарку, регистрация открыта.",
-      isNew: true,
-    },
-    {
-      id: 3,
-      orgId: 2,
-      text: "Опубликован отчёт о прошедшем событии. Смотрите детали.",
-      isNew: false,
-    },
-  ];
+  const loadNotifications = async () => {
+    if (!user?.access) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const res = await authFetch(`${API_BASE_URL}/api/notifications/`, {
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => []);
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch {
+      setNotifications([]);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.access]);
+
+  useEffect(() => {
+    if (notifOpen) loadNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifOpen]);
+
+  const markNotificationRead = async (id) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, is_new: false } : n))
+    );
+    try {
+      await authFetch(`${API_BASE_URL}/api/notifications/${id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_new: false }),
+        credentials: "include",
+      });
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -144,7 +168,7 @@ export default function Layout() {
                   alt="Уведомления"
                   className="relative z-10 w-3 h-3 transition-transform duration-300 lg:w-5 lg:h-5 group-hover:scale-110 group-hover:rotate-12"
                 />
-                {notifications.some((n) => n.isNew) && (
+                {notifications.some((n) => n.is_new) && (
                   <span className="absolute w-3 h-3 bg-red-500 border-2 border-white rounded-full top-1 right-1" />
                 )}
               </button>
@@ -156,38 +180,36 @@ export default function Layout() {
                       Уведомления
                     </span>
                     <span className="text-xs text-slate-500">
-                      Новых: {notifications.filter((n) => n.isNew).length}
+                      Новых: {notifications.filter((n) => n.is_new).length}
                     </span>
                   </div>
                   <div className="overflow-y-auto max-h-80">
                     {notifications.map((notif) => {
-                      const org = organizations.find(
-                        (o) => o.id === notif.orgId
-                      );
                       return (
                         <Link
-                          to={`/organization/${notif.orgId}`}
+                          to={`/organization/${notif.club}`}
                           key={notif.id}
-                          onClick={() => setNotifOpen(false)}
+                          onClick={() => {
+                            markNotificationRead(notif.id);
+                            setNotifOpen(false);
+                          }}
                           className={`flex items-center gap-3 px-3 py-3 border-b last:border-0 transition-colors ${
-                            notif.isNew
+                            notif.is_new
                               ? "bg-primary/10 hover:bg-primary/20"
                               : "bg-white hover:bg-slate-50"
                           }`}
                         >
                           <img
-                            src={`/OrganizationLogo/${
-                              org?.logo || "DefaultLogo.jpg"
-                            }`}
-                            alt={org?.name || "Организация"}
+                            src={buildMediaUrl(notif.club_avatar_url) || "/OrganizationLogo/DefaultLogo.jpg"}
+                            alt={notif.club_name || "Организация"}
                             className="object-cover w-10 h-10 border rounded-xl border-slate-200"
                           />
                           <div className="min-w-0">
                             <p className="text-sm font-semibold truncate text-slate-800">
-                              {org?.name || "Организация"}
+                              {notif.club_name || "Организация"}
                             </p>
                             <p className="text-xs truncate text-slate-600">
-                              {notif.text}
+                              {notif.text || notif.post_title || "Новый пост"}
                             </p>
                           </div>
                         </Link>

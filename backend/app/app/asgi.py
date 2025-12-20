@@ -8,9 +8,14 @@ https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
 """
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 from django.core.asgi import get_asgi_application
 
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[2].parent / ".env", override=False)
+load_dotenv(override=False)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.settings')
 
 application = get_asgi_application()

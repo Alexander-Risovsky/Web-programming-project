@@ -1,8 +1,11 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
+from django.core.exceptions import ValidationError
+from django.core.validators import EmailValidator
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import viewsets
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import extend_schema, OpenApiExample
@@ -16,6 +19,41 @@ from users.serializers import (
     UserSerializer,
     LoginSerializer,
 )
+
+
+_email_validator = EmailValidator()
+
+
+def _looks_like_email(value: str) -> bool:
+    if not value:
+        return False
+    try:
+        _email_validator(value)
+        return True
+    except ValidationError:
+        return False
+
+
+def _authenticate_by_login_or_email(request, login: str | None, password: str | None):
+    login = (login or "").strip()
+    password = password or ""
+    if not login or not password:
+        return None
+
+    if _looks_like_email(login):
+        User = get_user_model()
+        matches = list(
+            User.objects.filter(email__iexact=login).only("id", "username")[:2]
+        )
+        if len(matches) == 1:
+            user_by_email = matches[0]
+            return authenticate(
+                request, username=user_by_email.get_username(), password=password
+            )
+        if len(matches) > 1:
+            return None
+
+    return authenticate(request, username=login, password=password)
 
 
 @extend_schema(
@@ -133,7 +171,7 @@ class LoginStudentView(APIView):
         username = request.data.get("username")
         password = request.data.get("password")
 
-        user = authenticate(request, username=username, password=password)
+        user = _authenticate_by_login_or_email(request, username, password)
         if user is None:
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -182,7 +220,7 @@ class LoginClubView(APIView):
         username = request.data.get("username")
         password = request.data.get("password")
 
-        user = authenticate(request, username=username, password=password)
+        user = _authenticate_by_login_or_email(request, username, password)
         if user is None:
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -201,8 +239,10 @@ class LoginClubView(APIView):
 class ClubViewSet(viewsets.ModelViewSet):
     queryset = Club.objects.all()
     serializer_class = ClubSerializer
+    parser_classes = (MultiPartParser, FormParser)
 
 @extend_schema(tags=["Студенты"])
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()
-    serializer_class = StudentSerializer    
+    serializer_class = StudentSerializer
+    parser_classes = (MultiPartParser, FormParser)
