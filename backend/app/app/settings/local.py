@@ -21,6 +21,9 @@ INSTALLED_APPS = [
     "web",
 ]
 
+if USE_S3 and "storages" not in INSTALLED_APPS:
+    INSTALLED_APPS += ["storages"]
+
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True

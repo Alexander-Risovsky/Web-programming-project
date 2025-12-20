@@ -3,3 +3,21 @@ DB_USER=
 DB_PASSWORD=
 DB_HOST=
 DB_PORT=
+
+# S3 (reg.ru S3-compatible)
+S3_ENABLED=0
+S3_ENDPOINT_URL=https://s3.regru.cloud
+S3_BUCKET=web-media
+S3_REGION=
+# Optional: use virtual-hosted-style domain for PUBLIC objects (when S3_QUERYSTRING_AUTH=0)
+S3_CUSTOM_DOMAIN=web-media.website.regru.cloud
+
+# Credentials (keep secret; do NOT expose to frontend)
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+
+# Private bucket default: signed URLs
+S3_QUERYSTRING_AUTH=1
+S3_ADDRESSING_STYLE=path
+# SSL verification: set to 0 ONLY for local debug; or provide path to a custom CA bundle (.pem)
+S3_VERIFY=0

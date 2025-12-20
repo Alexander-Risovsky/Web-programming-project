@@ -28,7 +28,7 @@ export default function OrgLoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="relative h-screen overflow-hidden flex flex-col">
       <div className="absolute inset-0 bg-gradient-to-tl from-[rgba(98,90,228,0.15)] via-[rgba(139,92,246,0.1)] to-[rgba(255,255,255,1)] animate-gradient pointer-events-none" />
       <div className="absolute hidden bg-purple-300 rounded-full pointer-events-none lg:block top-20 right-20 w-72 h-72 mix-blend-multiply filter blur-xl opacity-20 animate-float" />
       <div
@@ -56,7 +56,7 @@ export default function OrgLoginPage() {
         </span>
       </header>
 
-      <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-120px)] sm:min-h-[calc(100vh-80px)] px-4 py-8 sm:py-12">
+      <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center px-4 py-6">
         <div className="relative w-full max-w-md p-6 overflow-hidden border-2 shadow-xl bg-white/90 backdrop-blur-sm sm:p-8 lg:p-10 rounded-2xl lg:rounded-3xl border-slate-200/50 animate-scale-in group">
           <div className="absolute top-0 right-0 hidden w-64 h-64 rounded-full pointer-events-none lg:block bg-gradient-to-br from-primary/10 to-purple-500/10 blur-3xl" />
           <div className="absolute bottom-0 left-0 hidden w-64 h-64 rounded-full pointer-events-none lg:block bg-gradient-to-tr from-blue-500/10 to-indigo-500/10 blur-3xl" />

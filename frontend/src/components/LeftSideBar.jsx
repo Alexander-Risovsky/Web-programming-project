@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, buildMediaUrl } from "../config";
+import { dedupFetch } from "../utils/dedupFetch";
 
 export default function LeftSidebar({
   currentPath,
@@ -9,7 +10,7 @@ export default function LeftSidebar({
   setMobileMenuOpen,
 }) {
   const location = useLocation();
-  const { user, isOrg } = useAuth();
+  const { user, isOrg, authFetch } = useAuth();
 
   const [orgInfo, setOrgInfo] = useState(null);
   const [clubs, setClubs] = useState([]);
@@ -38,7 +39,7 @@ export default function LeftSidebar({
       const clubId = user?.orgId || user?.id;
       if (!clubId) return;
       try {
-        const res = await fetch(`${API_BASE_URL}/api/clubs/${clubId}/`);
+        const res = await dedupFetch(`${API_BASE_URL}/api/clubs/${clubId}/`);
         if (!res.ok) return;
         const data = await res.json();
         setOrgInfo(data);
@@ -47,13 +48,13 @@ export default function LeftSidebar({
       }
     };
     loadOrg();
-  }, [user]);
+  }, [user?.role, user?.orgId, user?.id]);
 
   // загрузка клубов
   useEffect(() => {
     const loadClubs = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/clubs/`);
+        const res = await dedupFetch(`${API_BASE_URL}/api/clubs/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         setClubs(Array.isArray(data) ? data : []);
@@ -74,7 +75,7 @@ export default function LeftSidebar({
   // загрузка подписок студента
   useEffect(() => {
     const loadSubs = async () => {
-      if (user?.role !== "student" || !user?.id) {
+      if (user?.role !== "student") {
         setSubscriptions([]);
         setSubsStatus(null);
         return;
@@ -83,13 +84,12 @@ export default function LeftSidebar({
       setSubsStatus(status);
       setSubsLoading(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/subscriptions/`);
+        const res = await authFetch(`${API_BASE_URL}/api/subscriptions/`, {
+          credentials: "include",
+        });
         if (!res.ok) throw new Error();
         const data = await res.json();
-        const subs = Array.isArray(data)
-          ? data.filter((s) => s.user === user.id)
-          : [];
-        setSubscriptions(subs);
+        setSubscriptions(Array.isArray(data) ? data : []);
         setSubsStatus(null);
       } catch {
         setSubscriptions([]);
@@ -99,7 +99,7 @@ export default function LeftSidebar({
       }
     };
     loadSubs();
-  }, [user, subsVersion]);
+  }, [user?.role, user?.access, subsVersion, authFetch]);
 
   const orgName =
     user?.role === "org"
@@ -325,20 +325,32 @@ export default function LeftSidebar({
           className="flex items-center p-2.5 transition-all duration-300 border-2 border-transparent rounded-xl bg-slate-50 group animate-scale-in hover:border-primary/40 hover:shadow-md hover:scale-[1.01]"
         >
           <div className="relative flex-shrink-0">
-            <div className="flex items-center justify-center transition-all duration-300 rounded-full w-11 h-11 ring-2 ring-slate-200 group-hover:ring-primary/50 group-hover:scale-105 bg-gradient-to-br from-primary to-purple-600">
-              <svg
-                className="w-6 h-6 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+            <div className="flex items-center justify-center overflow-hidden transition-all duration-300 rounded-full w-11 h-11 ring-2 ring-slate-200 group-hover:ring-primary/50 group-hover:scale-105 bg-gradient-to-br from-primary to-purple-600">
+              {buildMediaUrl(user?.avatarUrl) ? (
+                <img
+                  src={buildMediaUrl(user?.avatarUrl)}
+                  alt=""
+                  className="object-cover w-full h-full"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "";
+                  }}
                 />
-              </svg>
+              ) : (
+                <svg
+                  className="w-6 h-6 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
+                </svg>
+              )}
             </div>
           </div>
 

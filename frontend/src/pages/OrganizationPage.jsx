@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, buildMediaUrl } from "../config";
 export default function OrganizationPage() {
   const { orgId } = useParams();
-  const { user } = useAuth();
+  const { user, authFetch } = useAuth();
 
   const [club, setClub] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -16,6 +16,7 @@ export default function OrganizationPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [notifyOn, setNotifyOn] = useState(false);
+  const [notifySaving, setNotifySaving] = useState(false);
   const [formFields, setFormFields] = useState([]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
@@ -47,13 +48,10 @@ export default function OrganizationPage() {
     const loadPosts = async () => {
       setLoadingPosts(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/posts/`);
+        const res = await fetch(`${API_BASE_URL}/api/posts/?club=${orgId}`);
         if (!res.ok) throw new Error();
         const data = await res.json();
-        const filtered = Array.isArray(data)
-          ? data.filter((p) => p.club === Number(orgId))
-          : [];
-        setPosts(filtered);
+        setPosts(Array.isArray(data) ? data : []);
       } catch {
         setPosts([]);
       } finally {
@@ -66,23 +64,28 @@ export default function OrganizationPage() {
   // загрузка подписки на клуб для текущего студента
   useEffect(() => {
     const loadSub = async () => {
-      if (user?.role !== "student" || !user?.id) {
+      if (user?.role !== "student") {
         setSubscriptionId(null);
+        setNotifyOn(false);
         return;
       }
       setSubsLoading(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/subscriptions/`);
+        const res = await authFetch(`${API_BASE_URL}/api/subscriptions/`, {
+          credentials: "include",
+        });
         if (!res.ok) throw new Error();
         const data = await res.json();
         const found = Array.isArray(data)
           ? data.find(
-              (s) => s.user === user.id && s.club === Number(orgId)
+              (s) => s.club === Number(orgId)
             )
           : null;
         setSubscriptionId(found ? found.id : null);
+        setNotifyOn(!!found?.notifications_enabled);
       } catch {
         setSubscriptionId(null);
+        setNotifyOn(false);
       } finally {
         setSubsLoading(false);
       }
@@ -130,11 +133,11 @@ export default function OrganizationPage() {
     setFormLoading(true);
     setFormError("");
     try {
-      const formsRes = await fetch(`${API_BASE_URL}/api/registration-forms/`);
+      const formsRes = await fetch(
+        `${API_BASE_URL}/api/registration-forms/?post=${postId}`
+      );
       const formsData = await formsRes.json().catch(() => null);
-      const form = Array.isArray(formsData)
-        ? formsData.find((f) => f.post === postId)
-        : null;
+      const form = Array.isArray(formsData) ? formsData[0] : formsData;
 
       if (!form?.id) {
         setFormId(null);
@@ -143,11 +146,13 @@ export default function OrganizationPage() {
       } else {
         setFormId(form.id);
 
-        const fieldsRes = await fetch(`${API_BASE_URL}/api/registration-fields/`);
+        const fieldsRes = await fetch(
+          `${API_BASE_URL}/api/registration-fields/?form=${form.id}&active=1`
+        );
         const fieldsData = await fieldsRes.json().catch(() => null);
         const fields = Array.isArray(fieldsData)
           ? fieldsData
-              .filter((f) => f.form === form.id)
+              .filter((f) => f?.is_active !== false)
               .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
           : [];
 
@@ -195,7 +200,7 @@ export default function OrganizationPage() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!selectedPost || !formId || !user?.id) {
+    if (!selectedPost || !formId) {
       setFormError("Форма недоступна для отправки");
       return;
     }
@@ -206,16 +211,15 @@ export default function OrganizationPage() {
     try {
       const baseHeaders = {
         "Content-Type": "application/json",
-        ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),
       };
 
-      const submissionRes = await fetch(
+      const submissionRes = await authFetch(
         `${API_BASE_URL}/api/registration-submissions/`,
         {
           method: "POST",
           headers: baseHeaders,
           credentials: "include",
-          body: JSON.stringify({ user: user.id, form: formId }),
+          body: JSON.stringify({ user: user?.userId ?? user?.id, form: formId }),
         }
       );
       const submissionData = await submissionRes.json().catch(() => null);
@@ -229,7 +233,7 @@ export default function OrganizationPage() {
 
       for (const field of formFields) {
         const value = answers[field.id] ?? "";
-        const answerRes = await fetch(
+        const answerRes = await authFetch(
           `${API_BASE_URL}/api/registration-answers/`,
           {
             method: "POST",
@@ -250,6 +254,7 @@ export default function OrganizationPage() {
         }
       }
 
+      window.dispatchEvent(new Event("registrations-updated"));
       closeModal();
       setToast({ type: "success", message: "Регистрация на мероприятие успешна" });
       setTimeout(() => setToast(null), 3500);
@@ -266,31 +271,80 @@ export default function OrganizationPage() {
   };
 
   const handleSubscribeToggle = async () => {
-    if (user?.role !== "student" || !user?.id || !club) return;
+    if (user?.role !== "student" || !club) return;
     try {
       setSubsLoading(true);
       if (!subscriptionId) {
         // subscribe
-        const res = await fetch(`${API_BASE_URL}/api/subscriptions/`, {
+        const res = await authFetch(`${API_BASE_URL}/api/subscriptions/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user: user.id, club: Number(orgId) }),
+          credentials: "include",
+          body: JSON.stringify({ club: Number(orgId) }),
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.detail || "Ошибка подписки");
         setSubscriptionId(data?.id || Date.now());
+        setNotifyOn(!!data?.notifications_enabled);
       } else {
         // unsubscribe
-        await fetch(`${API_BASE_URL}/api/subscriptions/${subscriptionId}/`, {
+        await authFetch(`${API_BASE_URL}/api/subscriptions/${subscriptionId}/`, {
           method: "DELETE",
+          credentials: "include",
         });
         setSubscriptionId(null);
+        setNotifyOn(false);
       }
       window.dispatchEvent(new Event("subscriptions-updated"));
     } catch (err) {
       console.error(err);
     } finally {
       setSubsLoading(false);
+    }
+  };
+
+  const handleNotifyToggle = async () => {
+    if (user?.role !== "student" || !club || !orgId) return;
+    if (notifySaving) return;
+
+    try {
+      setNotifySaving(true);
+
+      // If not subscribed yet, enabling notifications implies subscribe + enable.
+      if (!subscriptionId) {
+        const res = await authFetch(`${API_BASE_URL}/api/subscriptions/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            club: Number(orgId),
+            notifications_enabled: true,
+          }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.detail || "Не удалось включить уведомления");
+        setSubscriptionId(data?.id || Date.now());
+        setNotifyOn(true);
+        window.dispatchEvent(new Event("subscriptions-updated"));
+        return;
+      }
+
+      const nextValue = !notifyOn;
+      const res = await authFetch(`${API_BASE_URL}/api/subscriptions/${subscriptionId}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ notifications_enabled: nextValue }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.detail || "Не удалось обновить уведомления");
+      setNotifyOn(!!data?.notifications_enabled);
+    } catch (err) {
+      console.error(err);
+      setToast({ type: "error", message: err.message || "Не удалось обновить уведомления" });
+      setTimeout(() => setToast(null), 3500);
+    } finally {
+      setNotifySaving(false);
     }
   };
 
@@ -360,12 +414,13 @@ export default function OrganizationPage() {
                 {subscriptionId ? "Отписаться" : "Подписаться"}
               </button>
               <button
-                onClick={() => setNotifyOn((v) => !v)}
+                onClick={handleNotifyToggle}
+                disabled={notifySaving || subsLoading || user?.role !== "student"}
                 className={`px-4 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
                   notifyOn
                     ? "bg-white/90 border-2 border-primary/40 text-primary hover:bg-primary/5"
                     : " border-2 text-slate-600 bg-slate-100 border-slate-200 hover:bg-slate-200"
-                }`}
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {notifyOn ? "Уведомления включены" : "Включить уведомления"}
               </button>
@@ -396,10 +451,17 @@ export default function OrganizationPage() {
                   )}
                 </span>
               </div>
-              <p className="mb-3 text-slate-700">{post.content}</p>
-              {post.image_url && (
+              <p className="mb-3 text-slate-700 whitespace-pre-wrap break-words">
+                {post.content}
+              </p>
+              {(post.image_url || post.image) && (
                 <img
-                  src={buildMediaUrl(post.image_url) || post.image_url}
+                  src={
+                    buildMediaUrl(post.image_url) ||
+                    buildMediaUrl(post.image) ||
+                    post.image_url ||
+                    post.image
+                  }
                   alt={post.title}
                   className="object-cover w-full mb-3 h-60 rounded-xl"
                 />
