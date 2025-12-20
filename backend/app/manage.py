@@ -2,10 +2,16 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 
 def main():
     """Run administrative tasks."""
+    # Load env (incl. DJANGO_SETTINGS_MODULE/DB_*) so management commands work from any CWD.
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=False)
+    load_dotenv(override=False)
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.settings')
     try:
         from django.core.management import execute_from_command_line

@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from web.models import (
     Form,
+    Notification,
     Post,
     Registration,
     RegistrationAnswer,
@@ -20,8 +21,22 @@ class FormSerializer(serializers.ModelSerializer):
 
 
 class PostSerializer(serializers.ModelSerializer):
+    image_file = serializers.ImageField(source="image", write_only=True, required=False)
+    club_name = serializers.CharField(source="club.name", read_only=True)
+    club_avatar_url = serializers.ImageField(source="club.avatar_url", read_only=True)
+
     class Meta:
         model = Post
+        fields = "__all__"
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    club_name = serializers.CharField(source="club.name", read_only=True)
+    club_avatar_url = serializers.ImageField(source="club.avatar_url", read_only=True)
+    post_title = serializers.CharField(source="post.title", read_only=True)
+
+    class Meta:
+        model = Notification
         fields = "__all__"
 
 
@@ -34,7 +49,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(queryset=get_user_model().objects.all())
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Subscription

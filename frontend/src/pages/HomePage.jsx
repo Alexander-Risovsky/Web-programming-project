@@ -2,9 +2,11 @@
 import { createPortal } from "react-dom";
 import { API_BASE_URL, buildMediaUrl } from "../config";
 import { useAuth } from "../context/AuthContext";
+import { dedupFetch } from "../utils/dedupFetch";
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, authFetch } = useAuth();
+  const authUserId = user?.role === "student" ? (user?.userId ?? user?.id) : user?.id;
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -18,6 +20,14 @@ export default function HomePage() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [registeredPostIds, setRegisteredPostIds] = useState(new Set());
+  const [registrationsVersion, setRegistrationsVersion] = useState(0);
+
+  useEffect(() => {
+    const handler = () => setRegistrationsVersion((v) => v + 1);
+    window.addEventListener("registrations-updated", handler);
+    return () =>
+      window.removeEventListener("registrations-updated", handler);
+  }, []);
 
   useEffect(() => {
     const loadPosts = async () => {
@@ -25,7 +35,7 @@ export default function HomePage() {
       setError("");
       try {
         // В dev проксируется через vite.config.js на бекенд http://localhost:8000
-        const res = await fetch(`${API_BASE_URL}/api/posts/`);
+        const res = await dedupFetch(`${API_BASE_URL}/api/posts/`);
         if (!res.ok) {
           throw new Error(`Ошибка загрузки: ${res.status}`);
         }
@@ -49,29 +59,25 @@ export default function HomePage() {
 
   useEffect(() => {
     const loadRegistrations = async () => {
-      if (user?.role !== "student" || !user?.id) {
+      if (user?.role !== "student" || !authUserId) {
         setRegisteredPostIds(new Set());
         return;
       }
       try {
-        const baseHeaders = {
-          ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),
-        };
-        const subsRes = await fetch(
+        const subsRes = await authFetch(
           `${API_BASE_URL}/api/registration-submissions/`,
-          { headers: baseHeaders, credentials: "include" }
+          { credentials: "include" }
         );
         const submissions = await subsRes.json().catch(() => []);
         const userSubs = Array.isArray(submissions)
-          ? submissions.filter((s) => s.user === user.id)
+          ? submissions.filter((s) => s.user === authUserId)
           : [];
         if (userSubs.length === 0) {
           setRegisteredPostIds(new Set());
           return;
         }
 
-        const formsRes = await fetch(`${API_BASE_URL}/api/registration-forms/`, {
-          headers: baseHeaders,
+        const formsRes = await authFetch(`${API_BASE_URL}/api/registration-forms/`, {
           credentials: "include",
         });
         const forms = await formsRes.json().catch(() => []);
@@ -89,7 +95,7 @@ export default function HomePage() {
       }
     };
     loadRegistrations();
-  }, [user]);
+  }, [user?.role, user?.access, authUserId, registrationsVersion, authFetch]);
 
   const feed = useMemo(
     () =>
@@ -123,18 +129,11 @@ export default function HomePage() {
     setFormId(null);
     setAnswers({});
     try {
-      const baseHeaders = {
-        ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),
-      };
-
-      const formsRes = await fetch(`${API_BASE_URL}/api/registration-forms/`, {
-        headers: baseHeaders,
+      const formsRes = await authFetch(`${API_BASE_URL}/api/registration-forms/?post=${post.id}`, {
         credentials: "include",
       });
       const formsData = await formsRes.json().catch(() => null);
-      const form = Array.isArray(formsData)
-        ? formsData.find((f) => f.post === post.id)
-        : null;
+      const form = Array.isArray(formsData) ? formsData[0] : formsData;
 
       if (!form?.id) {
         setFormError("Для этого поста форма регистрации не настроена");
@@ -143,17 +142,16 @@ export default function HomePage() {
 
       setFormId(form.id);
 
-      const fieldsRes = await fetch(
-        `${API_BASE_URL}/api/registration-fields/`,
+      const fieldsRes = await authFetch(
+        `${API_BASE_URL}/api/registration-fields/?form=${form.id}&active=1`,
         {
-          headers: baseHeaders,
           credentials: "include",
         }
       );
       const fieldsData = await fieldsRes.json().catch(() => null);
       const fields = Array.isArray(fieldsData)
         ? fieldsData
-            .filter((f) => f.form === form.id)
+            .filter((f) => f?.is_active !== false)
             .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
         : [];
 
@@ -192,7 +190,7 @@ export default function HomePage() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!selectedPost || !formId || !user?.id) {
+    if (!selectedPost || !formId || !authUserId) {
       setFormError("Форма недоступна для отправки");
       return;
     }
@@ -201,16 +199,15 @@ export default function HomePage() {
     try {
       const baseHeaders = {
         "Content-Type": "application/json",
-        ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),
       };
 
-      const submissionRes = await fetch(
+      const submissionRes = await authFetch(
         `${API_BASE_URL}/api/registration-submissions/`,
         {
           method: "POST",
           headers: baseHeaders,
           credentials: "include",
-          body: JSON.stringify({ user: user.id, form: formId }),
+          body: JSON.stringify({ user: authUserId, form: formId }),
         }
       );
       const submissionData = await submissionRes.json().catch(() => null);
@@ -224,7 +221,7 @@ export default function HomePage() {
 
       for (const field of formFields) {
         const value = answers[field.id] ?? "";
-        const answerRes = await fetch(
+        const answerRes = await authFetch(
           `${API_BASE_URL}/api/registration-answers/`,
           {
             method: "POST",
@@ -245,6 +242,11 @@ export default function HomePage() {
         }
       }
 
+      if (selectedPost?.id) {
+        setRegisteredPostIds((prev) => new Set([...prev, selectedPost.id]));
+        window.dispatchEvent(new Event("registrations-updated"));
+      }
+
       closeModal();
       setToast({
         type: "success",
@@ -255,7 +257,7 @@ export default function HomePage() {
       setFormError(err.message || "Не удалось отправить заявку");
       setToast({
         type: "error",
-        message: "Не удалось подписаться на организацию",
+        message: "Не удалось зарегистрироваться на мероприятие",
       });
       setTimeout(() => setToast(null), 3500);
     } finally {
@@ -321,16 +323,21 @@ export default function HomePage() {
                   </div>
 
                   <p className="mb-1 text-sm font-semibold text-primary">
-                    Организация: {post.club ?? "—"}
+                    Организация: {post.club_name || (post.club ?? "-")}
                   </p>
 
                   <p className="mb-3 whitespace-pre-wrap text-slate-700">
                     {post.content}
                   </p>
 
-                  {post.image_url && (
+                  {(post.image_url || post.image) && (
                     <img
-                      src={buildMediaUrl(post.image_url) || post.image_url}
+                      src={
+                        buildMediaUrl(post.image_url) ||
+                        buildMediaUrl(post.image) ||
+                        post.image_url ||
+                        post.image
+                      }
                       alt={post.title}
                       className="object-cover w-full mb-3 h-60 rounded-xl"
                     />

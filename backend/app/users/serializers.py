@@ -67,11 +67,13 @@ class RegisterClubSerializer(serializers.Serializer):
 
 class StudentSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
+    avatar_file = serializers.ImageField(source="avatar_url", write_only=True, required=False)
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
     user_username = serializers.CharField(source='user.username', read_only=True)
     class Meta:
         model = Student
-        fields = ("id", "name", "surname", "course", "group", "major", "avatar_url", "user_email", "user_username")
+        fields = ("id", "user_id", "name", "surname", "course", "group", "major", "avatar_url", "avatar_file", "user_email", "user_username")
 
     def get_avatar_url(self, obj):
         if obj.avatar_url:
@@ -90,10 +92,11 @@ class UserSerializer(serializers.ModelSerializer):
 
 class ClubSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
+    avatar_file = serializers.ImageField(source="avatar_url", write_only=True, required=False)
 
     class Meta:
         model = Club
-        fields = ("id", "name", "description", "avatar_url", "created_at")
+        fields = ("id", "name", "description", "avatar_url", "avatar_file", "created_at")
 
     def get_avatar_url(self, obj):
         request = self.context.get("request")

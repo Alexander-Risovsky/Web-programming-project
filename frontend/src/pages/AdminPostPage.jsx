@@ -4,13 +4,15 @@ import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../config";
 
 export default function AdminPostPage() {
-  const { user } = useAuth();
+  const { user, authFetch } = useAuth();
   const isOrg = user?.role === "org";
 
   const [type, setType] = useState("info"); // info | event
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [imageSource, setImageSource] = useState("file"); // file | url
   const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null); // {type, message}
   const [formTitle, setFormTitle] = useState("");
@@ -48,20 +50,19 @@ export default function AdminPostPage() {
     }
     setSubmitting(true);
     try {
-      const payload = {
-        type,
-        title,
-        content,
-        image_url: imageUrl || "",
-        is_form: type === "event",
-        club: user?.orgId || user?.id,
-        form: null,
-      };
+      const formData = new FormData();
+      formData.append("type", type);
+      formData.append("title", title);
+      formData.append("content", content);
+      if (imageSource === "url") formData.append("image_url", imageUrl?.trim() || "");
+      formData.append("is_form", type === "event" ? "true" : "false");
+      formData.append("club", (user?.orgId || user?.id || "").toString());
+      if (imageSource === "file" && imageFile) formData.append("image_file", imageFile);
 
-      const res = await fetch(`${API_BASE_URL}/api/posts/`, {
+      const res = await authFetch(`${API_BASE_URL}/api/posts/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        credentials: "include",
+        body: formData,
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -71,10 +72,9 @@ export default function AdminPostPage() {
       if (type === "event" && formFields.length > 0 && data?.id) {
         const baseHeaders = {
           "Content-Type": "application/json",
-          ...(user?.access ? { Authorization: `Bearer ${user.access}` } : {}),
         };
 
-        const formRes = await fetch(`${API_BASE_URL}/api/registration-forms/`, {
+        const formRes = await authFetch(`${API_BASE_URL}/api/registration-forms/`, {
           method: "POST",
           headers: baseHeaders,
           body: JSON.stringify({
@@ -91,7 +91,7 @@ export default function AdminPostPage() {
 
         for (let i = 0; i < formFields.length; i += 1) {
           const field = formFields[i];
-          const fieldRes = await fetch(
+          const fieldRes = await authFetch(
             `${API_BASE_URL}/api/registration-fields/`,
             {
               method: "POST",
@@ -119,6 +119,8 @@ export default function AdminPostPage() {
       setTitle("");
       setContent("");
       setImageUrl("");
+      setImageFile(null);
+      setImageSource("file");
       setType("info");
       setFormTitle("");
       setFormFields([]);
@@ -211,16 +213,84 @@ export default function AdminPostPage() {
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-700">
-              Картинка (URL)
+              Картинка
             </label>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-            />
+            <div className="inline-flex items-center gap-2 p-1 ml-2 border bg-slate-100/70 border-slate-200 rounded-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setImageSource("file");
+                  setImageUrl("");
+                }}
+                className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                  imageSource === "file"
+                    ? "bg-gradient-to-r from-primary via-purple-600 to-indigo-600 text-white shadow-md"
+                    : "text-slate-700 hover:bg-white"
+                }`}
+              >
+                Файлом
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setImageSource("url");
+                  setImageFile(null);
+                }}
+                className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                  imageSource === "url"
+                    ? "bg-gradient-to-r from-primary via-purple-600 to-indigo-600 text-white shadow-md"
+                    : "text-slate-700 hover:bg-white"
+                }`}
+              >
+                По ссылке
+              </button>
+            </div>
           </div>
+
+          {imageSource === "url" && (
+            <div className="space-y-2">
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full h-[52px] px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
+              />
+              <p className="text-xs text-slate-500 min-h-[1rem]">{"\u00A0"}</p>
+            </div>
+          )}
+
+          {imageSource === "file" && (
+            <div className="space-y-2">
+              <input
+                id="post-image-file"
+                type="file"
+                hidden
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (!file.type?.startsWith("image/")) {
+                    showToast("error", "Выбери изображение (png/jpg/webp и т.п.)");
+                    e.target.value = "";
+                    return;
+                  }
+                  setImageUrl("");
+                  setImageFile(file);
+                }}
+                className="hidden"
+              />
+              <label
+                htmlFor="post-image-file"
+                className="w-full h-[52px] inline-flex items-center justify-center px-4 py-3 font-semibold text-white rounded-xl border-2 border-transparent bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.01] transition-all cursor-pointer select-none"
+              >
+                Выбрать файл
+              </label>
+              <p className="text-xs text-slate-500 min-h-[1rem]">
+                {imageFile ? `Выбрано: ${imageFile.name}` : "\u00A0"}
+              </p>
+            </div>
+          )}
 
           {type === "event" && (
             <div className="p-4 space-y-3 border rounded-xl border-slate-200 bg-slate-50/70">
