@@ -8,6 +8,7 @@ from rest_framework import viewsets
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from drf_spectacular.utils import extend_schema, OpenApiExample
 
 from users.models import Student
@@ -165,6 +166,7 @@ class RegisterClubView(APIView):
     ],
 )
 class LoginStudentView(APIView):
+    authentication_classes = (JWTAuthentication,)
     permission_classes = (AllowAny,)
 
     def post(self, request):
@@ -214,6 +216,7 @@ class LoginStudentView(APIView):
     ],
 )
 class LoginClubView(APIView):
+    authentication_classes = (JWTAuthentication,)
     permission_classes = (AllowAny,)
 
     def post(self, request):

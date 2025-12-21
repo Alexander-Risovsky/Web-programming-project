@@ -10,11 +10,8 @@ RUN npm run build
 
 RUN npm install -g serve
 
-# Копируем скрипт
-COPY frontend/env.sh /app/env.sh
-RUN chmod +x /app/env.sh
-
+# Amvera ожидает порт 80
 EXPOSE 80
 
-# Запускаем скрипт, который заменит переменные и запустит serve
-CMD ["/app/env.sh"]
+# Запускаем на порту 80
+CMD ["serve", "-s", "dist", "-l", "80"]
