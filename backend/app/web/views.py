@@ -138,11 +138,31 @@ class RegistrationSubmissionViewSet(viewsets.ModelViewSet):
     queryset = RegistrationSubmission.objects.all()
     serializer_class = RegistrationSubmissionSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        form_id = self.request.query_params.get("form")
+        if form_id:
+            qs = qs.filter(form_id=form_id)
+        user_id = self.request.query_params.get("user")
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+        return qs
+
 
 @extend_schema(tags=["Ответы на поля форм"])
 class RegistrationAnswerViewSet(viewsets.ModelViewSet):
     queryset = RegistrationAnswer.objects.all()
     serializer_class = RegistrationAnswerSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        submission_id = self.request.query_params.get("submission")
+        if submission_id:
+            qs = qs.filter(submission_id=submission_id)
+        field_id = self.request.query_params.get("field")
+        if field_id:
+            qs = qs.filter(field_id=field_id)
+        return qs
 
 
 @extend_schema(tags=["Подписки"])

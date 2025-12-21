@@ -22,6 +22,10 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 
 function ProtectedRoute({ children, allowRole }) {
   const { user } = useAuth();
+  const isAuthenticated = !!(user?.access || user?.refresh);
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
   if (allowRole && user?.role !== allowRole) {
     return <Navigate to="/" replace />;
   }

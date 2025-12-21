@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { posts, organizations } from "../data/mockOrgsAndPosts";
 import { API_BASE_URL, buildMediaUrl } from "../config";
@@ -21,6 +22,18 @@ export default function ProfilePage() {
   const [statsModalOpen, setStatsModalOpen] = useState(false);
   const [registeredEventsRemote, setRegisteredEventsRemote] = useState([]);
   const [registeredEventsLoading, setRegisteredEventsLoading] = useState(false);
+  const [registrationMetaByPostId, setRegistrationMetaByPostId] = useState(
+    new Map()
+  );
+  const [regViewOpen, setRegViewOpen] = useState(false);
+  const [regViewPost, setRegViewPost] = useState(null);
+  const [regViewLoading, setRegViewLoading] = useState(false);
+  const [regViewError, setRegViewError] = useState("");
+  const [regViewFields, setRegViewFields] = useState([]);
+  const [regViewAnswersByField, setRegViewAnswersByField] = useState({});
+  const [regViewSubmissionId, setRegViewSubmissionId] = useState(null);
+  const [regViewFormId, setRegViewFormId] = useState(null);
+  const [regCancelLoading, setRegCancelLoading] = useState(false);
   const [registrationsVersion, setRegistrationsVersion] = useState(0);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState("");
@@ -37,6 +50,8 @@ export default function ProfilePage() {
   });
 
   const editRegLoadedPostIdRef = useRef(null);
+  const regFieldsCacheRef = useRef(new Map());
+  const regAnswersCacheRef = useRef(new Map());
   const [editRegFormId, setEditRegFormId] = useState(null);
   const [editRegTitle, setEditRegTitle] = useState("");
   const [editRegFields, setEditRegFields] = useState([]);
@@ -223,6 +238,159 @@ export default function ProfilePage() {
 
   const getOrg = (orgId) => organizations.find((o) => o.id === orgId);
 
+  const closeRegistrationView = () => {
+    setRegViewOpen(false);
+    setRegViewPost(null);
+    setRegViewLoading(false);
+    setRegViewError("");
+    setRegViewFields([]);
+    setRegViewAnswersByField({});
+    setRegViewSubmissionId(null);
+    setRegViewFormId(null);
+    setRegCancelLoading(false);
+  };
+
+  const loadRegistrationView = async (post) => {
+    if (!post?.id || isOrg || !authUserId) return;
+
+    setRegViewLoading(true);
+    setRegViewError("");
+    setRegViewFields([]);
+    setRegViewAnswersByField({});
+    setRegViewSubmissionId(null);
+    setRegViewFormId(null);
+
+    try {
+      const meta = registrationMetaByPostId.get(post.id);
+
+      let formId = meta?.formId ?? null;
+      if (!formId) {
+        const formsRes = await authFetch(
+          `${API_BASE_URL}/api/registration-forms/?post=${post.id}`,
+          { credentials: "include" }
+        );
+        const formsData = await formsRes.json().catch(() => null);
+        const form = Array.isArray(formsData) ? formsData[0] : formsData;
+        formId = form?.id ?? null;
+      }
+      if (!formId) {
+        throw new Error("Форма регистрации не найдена");
+      }
+
+      let submissionId = meta?.submissionId ?? null;
+      if (!submissionId) {
+        const subsRes = await authFetch(
+          `${API_BASE_URL}/api/registration-submissions/?user=${authUserId}&form=${formId}`,
+          { credentials: "include" }
+        );
+        const subsData = await subsRes.json().catch(() => null);
+        const sub = Array.isArray(subsData) ? subsData[0] : subsData;
+        submissionId = sub?.id ?? null;
+      }
+      if (!submissionId) {
+        throw new Error("Заявка не найдена");
+      }
+
+      setRegViewFormId(formId);
+      setRegViewSubmissionId(submissionId);
+
+      const cachedFields = regFieldsCacheRef.current.get(formId);
+      const cachedAnswers = regAnswersCacheRef.current.get(submissionId);
+
+      const fieldsPromise =
+        cachedFields !== undefined
+          ? Promise.resolve(cachedFields)
+          : authFetch(`${API_BASE_URL}/api/registration-fields/?form=${formId}`, {
+              credentials: "include",
+            })
+              .then((r) => r.json().catch(() => []))
+              .then((fieldsData) => {
+                const fields = Array.isArray(fieldsData)
+                  ? fieldsData
+                      .slice()
+                      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                  : [];
+                regFieldsCacheRef.current.set(formId, fields);
+                return fields;
+              })
+              .catch(() => []);
+
+      const answersPromise =
+        cachedAnswers !== undefined
+          ? Promise.resolve(cachedAnswers)
+          : authFetch(
+              `${API_BASE_URL}/api/registration-answers/?submission=${submissionId}`,
+              { credentials: "include" }
+            )
+              .then((r) => r.json().catch(() => []))
+              .then((answersData) => {
+                const answersMap = {};
+                (Array.isArray(answersData) ? answersData : []).forEach((ans) => {
+                  if (ans?.field) answersMap[ans.field] = ans.value_text || "";
+                });
+                regAnswersCacheRef.current.set(submissionId, answersMap);
+                return answersMap;
+              })
+              .catch(() => ({}));
+
+      const [fields, answersMap] = await Promise.all([fieldsPromise, answersPromise]);
+
+      setRegViewFields(fields);
+      setRegViewAnswersByField(answersMap);
+    } catch (err) {
+      setRegViewError(err.message || "Не удалось загрузить регистрацию");
+    } finally {
+      setRegViewLoading(false);
+    }
+  };
+
+  const openRegistrationView = (post) => {
+    setRegViewOpen(true);
+    setRegViewPost(post);
+    loadRegistrationView(post);
+  };
+
+  const cancelRegistration = async () => {
+    if (!regViewPost?.id || !regViewSubmissionId) {
+      setRegViewError("Не удалось найти вашу заявку");
+      return;
+    }
+    if (regCancelLoading) return;
+
+    setRegCancelLoading(true);
+    setRegViewError("");
+
+    try {
+      const res = await authFetch(
+        `${API_BASE_URL}/api/registration-submissions/${regViewSubmissionId}/`,
+        { method: "DELETE", credentials: "include" }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.detail || `Ошибка удаления: ${res.status}`);
+      }
+
+      setRegisteredEventsRemote((prev) =>
+        Array.isArray(prev) ? prev.filter((p) => p.id !== regViewPost.id) : []
+      );
+      setRegistrationMetaByPostId((prev) => {
+        const next = new Map(prev);
+        next.delete(regViewPost.id);
+        return next;
+      });
+      regAnswersCacheRef.current.delete(regViewSubmissionId);
+      window.dispatchEvent(new Event("registrations-updated"));
+
+      closeRegistrationView();
+      setToast({ type: "success", message: "Регистрация отменена" });
+      setTimeout(() => setToast(null), 3500);
+    } catch (err) {
+      setRegViewError(err.message || "Не удалось отменить регистрацию");
+    } finally {
+      setRegCancelLoading(false);
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (
@@ -251,6 +419,20 @@ export default function ProfilePage() {
     } catch {
       return "";
     }
+  };
+
+  const getFieldOptions = (field) => {
+    if (!field?.options) return [];
+    try {
+      const parsed = JSON.parse(field.options);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+    return field.options
+      .split(",")
+      .map((opt) => opt.trim())
+      .filter(Boolean);
   };
 
   const loadEditRegistration = async (postId) => {
@@ -338,6 +520,7 @@ export default function ProfilePage() {
     const loadRegistrations = async () => {
       if (isOrg || !authUserId) {
         setRegisteredEventsRemote([]);
+        setRegistrationMetaByPostId(new Map());
         return;
       }
       setRegisteredEventsLoading(true);
@@ -352,6 +535,7 @@ export default function ProfilePage() {
           : [];
         if (userSubs.length === 0) {
           setRegisteredEventsRemote([]);
+          setRegistrationMetaByPostId(new Map());
           return;
         }
 
@@ -362,16 +546,23 @@ export default function ProfilePage() {
           }
         );
         const forms = await formsRes.json().catch(() => []);
-        const formIdSet = new Set(userSubs.map((s) => s.form));
-        const postIds = new Set(
-          Array.isArray(forms)
-            ? forms
-                .filter((f) => formIdSet.has(f.id) && f.post)
-                .map((f) => f.post)
-            : []
+        const formsById = new Map(
+          (Array.isArray(forms) ? forms : []).map((f) => [f.id, f])
         );
+        const postIds = new Set();
+        const meta = new Map();
+        userSubs.forEach((s) => {
+          const form = formsById.get(s.form);
+          if (!form?.post) return;
+          postIds.add(form.post);
+          if (!meta.has(form.post)) {
+            meta.set(form.post, { submissionId: s.id, formId: s.form });
+          }
+        });
+        setRegistrationMetaByPostId(meta);
         if (postIds.size === 0) {
           setRegisteredEventsRemote([]);
+          setRegistrationMetaByPostId(new Map());
           return;
         }
 
@@ -386,6 +577,7 @@ export default function ProfilePage() {
         setRegisteredEventsRemote(filtered);
       } catch {
         setRegisteredEventsRemote([]);
+        setRegistrationMetaByPostId(new Map());
       } finally {
         setRegisteredEventsLoading(false);
       }
@@ -997,7 +1189,12 @@ export default function ProfilePage() {
             ) : (
               <div className="space-y-4">
                 {registeredEvents.map((event, idx) => {
-                  const org = getOrg(event.orgId) || getOrg(event.club);
+                  const orgId = event.club;
+                  const orgName =
+                    event.club_name ||
+                    getOrg(event.orgId)?.name ||
+                    getOrg(event.club)?.name ||
+                    "Организация";
                   return (
                     <article
                       key={event.id}
@@ -1006,9 +1203,41 @@ export default function ProfilePage() {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-primary">
-                            {org?.name || "Организация"}
-                          </p>
+                          {orgId ? (
+                            <div className="flex items-center gap-2">
+                              <Link
+                                to={`/organization/${orgId}`}
+                                className="flex items-center justify-center w-8 h-8 overflow-hidden bg-white border rounded-full border-slate-200 hover:border-primary transition"
+                                aria-label={orgName}
+                                title={orgName}
+                              >
+                                <img
+                                  src={
+                                    buildMediaUrl(event.club_avatar_url) ||
+                                    "/OrganizationLogo/DefaultLogo.jpg"
+                                  }
+                                  alt={orgName}
+                                  className="object-cover w-full h-full"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src =
+                                      "/OrganizationLogo/DefaultLogo.jpg";
+                                  }}
+                                />
+                              </Link>
+                              <Link
+                                to={`/organization/${orgId}`}
+                                className="text-sm font-semibold text-primary hover:underline"
+                              >
+                                {orgName}
+                              </Link>
+                            </div>
+                          ) : (
+                            <p className="text-sm font-semibold text-primary">
+                              {orgName}
+                            </p>
+                          )}
                           <h3 className="text-lg font-bold text-slate-900 lg:text-xl">
                             {event.title}
                           </h3>
@@ -1020,7 +1249,9 @@ export default function ProfilePage() {
                         </span>
                       </div>
 
-                      <p className="mb-3 text-slate-700">{event.content}</p>
+                      <p className="mb-3 text-slate-700 whitespace-pre-wrap break-words">
+                        {event.content}
+                      </p>
 
                       {event.image_url || event.image ? (
                         <img
@@ -1034,6 +1265,16 @@ export default function ProfilePage() {
                           className="object-cover w-full mb-3 rounded-xl max-h-60"
                         />
                       ) : null}
+
+                      <div className="flex justify-end mt-3">
+                        <button
+                          type="button"
+                          onClick={() => openRegistrationView(event)}
+                          className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-emerald-500 shadow-md hover:shadow-lg transition-all"
+                        >
+                          Вы зарегистрированы
+                        </button>
+                      </div>
                     </article>
                   );
                 })}
@@ -1149,6 +1390,99 @@ export default function ProfilePage() {
           </div>
         )}
       </section>
+      {regViewOpen && regViewPost && (
+        <div
+          className="fixed inset-0 z-[12000] flex items-center justify-center w-screen h-screen bg-black/60 backdrop-blur-sm px-4"
+          onClick={closeRegistrationView}
+        >
+          <div
+            className="relative w-full max-w-md p-6 bg-white shadow-2xl rounded-2xl animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-2 text-xl font-bold text-slate-900">
+              Ваша регистрация
+            </h3>
+            <p className="mb-4 text-sm text-slate-600">{regViewPost.title}</p>
+
+            <form className="space-y-3" onSubmit={(e) => e.preventDefault()}>
+              {regViewLoading ? (
+                <p className="text-sm text-slate-600">Загружаем ответы...</p>
+              ) : regViewError ? (
+                <div className="p-3 text-sm border rounded-lg text-rose-600 bg-rose-50 border-rose-200">
+                  {regViewError}
+                </div>
+              ) : regViewFields.length === 0 ? (
+                <p className="text-sm text-slate-600">
+                  Форма регистрации пока не заполнена.
+                </p>
+              ) : (
+                regViewFields.map((field) => {
+                  const options = getFieldOptions(field);
+                  const inputType =
+                    field.field_type === "number"
+                      ? "number"
+                      : field.field_type === "date"
+                      ? "date"
+                      : field.field_type === "email"
+                      ? "email"
+                      : field.field_type === "phone"
+                      ? "tel"
+                      : "text";
+
+                  return (
+                    <div key={field.id} className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-600">
+                        {field.label}
+                      </label>
+                      {field.field_type === "select" ? (
+                        <select
+                          value={regViewAnswersByField[field.id] ?? ""}
+                          disabled
+                          className="w-full px-3 py-2 bg-white border-2 rounded-lg border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                        >
+                          <option value="">
+                            {regViewAnswersByField[field.id] ? "" : "—"}
+                          </option>
+                          {options.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type={inputType}
+                          value={regViewAnswersByField[field.id] ?? ""}
+                          disabled
+                          className="w-full px-3 py-2 bg-white border-2 rounded-lg border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                      )}
+                    </div>
+                  );
+                })
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeRegistrationView}
+                  className="px-4 py-2 text-sm font-semibold transition border text-slate-600 rounded-xl bg-slate-100 border-slate-200 hover:bg-slate-200"
+                >
+                  Закрыть
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelRegistration}
+                  disabled={regCancelLoading || regViewLoading}
+                  className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-rose-500 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {regCancelLoading ? "Отменяем..." : "Отменить регистрацию"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {orgEditOpen && isOrg && (
         <div
           className="fixed inset-0 z-[12000] flex items-center justify-center w-screen h-screen bg-black/60 backdrop-blur-sm px-4"

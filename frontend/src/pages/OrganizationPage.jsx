@@ -6,6 +6,8 @@ import { API_BASE_URL, buildMediaUrl } from "../config";
 export default function OrganizationPage() {
   const { orgId } = useParams();
   const { user, authFetch } = useAuth();
+  const authUserId =
+    user?.role === "student" ? user?.userId ?? user?.id : user?.id;
 
   const [club, setClub] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -24,6 +26,19 @@ export default function OrganizationPage() {
   const [formId, setFormId] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [toast, setToast] = useState(null);
+  const [registeredPostIds, setRegisteredPostIds] = useState(new Set());
+  const [registrationMetaByPostId, setRegistrationMetaByPostId] = useState(
+    new Map()
+  );
+  const [registrationsVersion, setRegistrationsVersion] = useState(0);
+  const [modalMode, setModalMode] = useState("create"); // create | view
+  const [viewSubmissionId, setViewSubmissionId] = useState(null);
+
+  useEffect(() => {
+    const handler = () => setRegistrationsVersion((v) => v + 1);
+    window.addEventListener("registrations-updated", handler);
+    return () => window.removeEventListener("registrations-updated", handler);
+  }, []);
 
   // загрузка клуба
   useEffect(() => {
@@ -42,6 +57,58 @@ export default function OrganizationPage() {
     };
     if (orgId) loadClub();
   }, [orgId]);
+
+  useEffect(() => {
+	    const loadRegistrations = async () => {
+	      if (user?.role !== "student" || !authUserId) {
+	        setRegisteredPostIds(new Set());
+	        setRegistrationMetaByPostId(new Map());
+	        return;
+	      }
+	      try {
+	        const subsRes = await authFetch(
+	          `${API_BASE_URL}/api/registration-submissions/`,
+          { credentials: "include" }
+        );
+        const submissions = await subsRes.json().catch(() => []);
+	        const userSubs = Array.isArray(submissions)
+	          ? submissions.filter((s) => s.user === authUserId)
+	          : [];
+	        if (userSubs.length === 0) {
+	          setRegisteredPostIds(new Set());
+	          setRegistrationMetaByPostId(new Map());
+	          return;
+	        }
+
+	        const formsRes = await authFetch(`${API_BASE_URL}/api/registration-forms/`, {
+	          credentials: "include",
+	        });
+	        const forms = await formsRes.json().catch(() => []);
+
+	        const formsById = new Map(
+	          (Array.isArray(forms) ? forms : []).map((f) => [f.id, f])
+	        );
+	        const postIds = [];
+	        const meta = new Map();
+	        userSubs.forEach((s) => {
+	          const form = formsById.get(s.form);
+	          if (!form?.post) return;
+	          postIds.push(form.post);
+	          if (!meta.has(form.post)) {
+	            meta.set(form.post, { submissionId: s.id, formId: s.form });
+	          }
+	        });
+
+	        setRegisteredPostIds(new Set(postIds));
+	        setRegistrationMetaByPostId(meta);
+	      } catch {
+	        setRegisteredPostIds(new Set());
+	        setRegistrationMetaByPostId(new Map());
+	      }
+	    };
+
+    loadRegistrations();
+  }, [user?.role, user?.access, authUserId, registrationsVersion, authFetch]);
 
   // загрузка постов клуба
   useEffect(() => {
@@ -129,12 +196,13 @@ export default function OrganizationPage() {
       .filter(Boolean);
   };
 
-  const loadFormForPost = async (postId) => {
+  const loadFormForPost = async (postId, nextMode, submissionId) => {
     setFormLoading(true);
     setFormError("");
     try {
-      const formsRes = await fetch(
-        `${API_BASE_URL}/api/registration-forms/?post=${postId}`
+      const formsRes = await authFetch(
+        `${API_BASE_URL}/api/registration-forms/?post=${postId}`,
+        { credentials: "include" }
       );
       const formsData = await formsRes.json().catch(() => null);
       const form = Array.isArray(formsData) ? formsData[0] : formsData;
@@ -146,21 +214,47 @@ export default function OrganizationPage() {
       } else {
         setFormId(form.id);
 
-        const fieldsRes = await fetch(
-          `${API_BASE_URL}/api/registration-fields/?form=${form.id}&active=1`
-        );
-        const fieldsData = await fieldsRes.json().catch(() => null);
-        const fields = Array.isArray(fieldsData)
+        const fieldsPromise = authFetch(
+          `${API_BASE_URL}/api/registration-fields/?form=${form.id}${
+            nextMode === "create" ? "&active=1" : ""
+          }`,
+          { credentials: "include" }
+        )
+          .then((r) => r.json().catch(() => null))
+          .catch(() => null);
+
+        const answersPromise =
+          nextMode === "view" && submissionId
+            ? authFetch(
+                `${API_BASE_URL}/api/registration-answers/?submission=${submissionId}`,
+                { credentials: "include" }
+              )
+                .then((r) => r.json().catch(() => []))
+                .catch(() => [])
+            : Promise.resolve([]);
+
+        const [fieldsData, answersData] = await Promise.all([
+          fieldsPromise,
+          answersPromise,
+        ]);
+
+        const sortedFields = Array.isArray(fieldsData)
           ? fieldsData
-              .filter((f) => f?.is_active !== false)
+              .slice()
               .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
           : [];
+        const fields =
+          nextMode === "create"
+            ? sortedFields.filter((f) => f?.is_active !== false)
+            : sortedFields;
 
         setFormFields(fields);
-        const initialAnswers = {};
-        fields.forEach((f) => {
-          initialAnswers[f.id] = "";
+        const initialAnswers = Object.fromEntries(fields.map((f) => [f.id, ""]));
+
+        (Array.isArray(answersData) ? answersData : []).forEach((ans) => {
+          if (ans?.field) initialAnswers[ans.field] = ans.value_text || "";
         });
+
         setAnswers(initialAnswers);
       }
     } catch (err) {
@@ -177,15 +271,33 @@ export default function OrganizationPage() {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  const openModal = (post) => {
+  const openRegisterModal = (post) => {
     setSelectedPost(post);
     setFormFields([]);
     setAnswers({});
     setFormError("");
     setFormId(null);
+    setModalMode("create");
+    setViewSubmissionId(null);
     setModalOpen(true);
     if (post?.id) {
-      loadFormForPost(post.id);
+      loadFormForPost(post.id, "create", null);
+    }
+  };
+
+  const openViewModal = (post) => {
+    const meta = registrationMetaByPostId.get(post.id);
+    const submissionId = meta?.submissionId ?? null;
+    setSelectedPost(post);
+    setFormFields([]);
+    setAnswers({});
+    setFormError("");
+    setFormId(null);
+    setModalMode("view");
+    setViewSubmissionId(submissionId);
+    setModalOpen(true);
+    if (post?.id) {
+      loadFormForPost(post.id, "view", submissionId);
     }
   };
 
@@ -196,11 +308,14 @@ export default function OrganizationPage() {
     setAnswers({});
     setFormError("");
     setFormId(null);
+    setModalMode("create");
+    setViewSubmissionId(null);
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!selectedPost || !formId) {
+    if (modalMode !== "create") return;
+    if (!selectedPost || !formId || !authUserId) {
       setFormError("Форма недоступна для отправки");
       return;
     }
@@ -219,7 +334,7 @@ export default function OrganizationPage() {
           method: "POST",
           headers: baseHeaders,
           credentials: "include",
-          body: JSON.stringify({ user: user?.userId ?? user?.id, form: formId }),
+          body: JSON.stringify({ user: authUserId, form: formId }),
         }
       );
       const submissionData = await submissionRes.json().catch(() => null);
@@ -254,6 +369,12 @@ export default function OrganizationPage() {
         }
       }
 
+      setRegisteredPostIds((prev) => new Set([...prev, selectedPost.id]));
+      setRegistrationMetaByPostId((prev) => {
+        const next = new Map(prev);
+        next.set(selectedPost.id, { submissionId, formId });
+        return next;
+      });
       window.dispatchEvent(new Event("registrations-updated"));
       closeModal();
       setToast({ type: "success", message: "Регистрация на мероприятие успешна" });
@@ -265,6 +386,46 @@ export default function OrganizationPage() {
         message: "Не удалось подписаться на организацию",
       });
       setTimeout(() => setToast(null), 3500);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleCancelRegistration = async () => {
+    if (modalMode !== "view" || !selectedPost?.id) return;
+    if (!viewSubmissionId) {
+      setFormError("Не удалось найти вашу заявку");
+      return;
+    }
+    setSubmitLoading(true);
+    setFormError("");
+    try {
+      const res = await authFetch(
+        `${API_BASE_URL}/api/registration-submissions/${viewSubmissionId}/`,
+        { method: "DELETE", credentials: "include" }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.detail || `Ошибка удаления: ${res.status}`);
+      }
+
+      setRegisteredPostIds((prev) => {
+        const next = new Set(prev);
+        next.delete(selectedPost.id);
+        return next;
+      });
+      setRegistrationMetaByPostId((prev) => {
+        const next = new Map(prev);
+        next.delete(selectedPost.id);
+        return next;
+      });
+      window.dispatchEvent(new Event("registrations-updated"));
+
+      closeModal();
+      setToast({ type: "success", message: "Регистрация отменена" });
+      setTimeout(() => setToast(null), 3500);
+    } catch (err) {
+      setFormError(err.message || "Не удалось отменить регистрацию");
     } finally {
       setSubmitLoading(false);
     }
@@ -466,13 +627,24 @@ export default function OrganizationPage() {
                   className="object-cover w-full mb-3 h-60 rounded-xl"
                 />
               )}
-              {post.type === "event" || post.is_form ? (
+              {(post.type === "event" || post.is_form) && user?.role === "student" ? (
                 <div className="flex justify-end">
                   <button
-                    onClick={() => openModal(post)}
-                    className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all"
+                    type="button"
+                    onClick={() =>
+                      registeredPostIds.has(post.id)
+                        ? openViewModal(post)
+                        : openRegisterModal(post)
+                    }
+                    className={
+                      registeredPostIds.has(post.id)
+                        ? "px-4 py-2 text-sm font-semibold text-white rounded-xl bg-emerald-500 shadow-md hover:shadow-lg transition-all"
+                        : "px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all"
+                    }
                   >
-                    Зарегистрироваться
+                    {registeredPostIds.has(post.id)
+                      ? "Вы зарегистрированы"
+                      : "Зарегистрироваться"}
                   </button>
                 </div>
               ) : null}
@@ -499,11 +671,20 @@ export default function OrganizationPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="mb-2 text-xl font-bold text-slate-900">
-                Регистрация на мероприятие
+                {modalMode === "view"
+                  ? "Ваша регистрация"
+                  : "Регистрация на мероприятие"}
               </h3>
               <p className="mb-4 text-sm text-slate-600">{selectedPost.title}</p>
 
-              <form className="space-y-3" onSubmit={handleRegister}>
+              <form
+                className="space-y-3"
+                onSubmit={
+                  modalMode === "create"
+                    ? handleRegister
+                    : (e) => e.preventDefault()
+                }
+              >
                 {formLoading ? (
                   <p className="text-sm text-slate-600">Загружаем вопросы формы...</p>
                 ) : formError ? (
@@ -538,7 +719,8 @@ export default function OrganizationPage() {
                             onChange={(e) =>
                               handleAnswerChange(field.id, e.target.value)
                             }
-                            required={!!field.is_required}
+                            required={modalMode === "create" && !!field.is_required}
+                            disabled={modalMode === "view"}
                             className="w-full px-3 py-2 border-2 rounded-lg border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                           >
                             <option value="">Выберите вариант</option>
@@ -555,7 +737,8 @@ export default function OrganizationPage() {
                             onChange={(e) =>
                               handleAnswerChange(field.id, e.target.value)
                             }
-                            required={!!field.is_required}
+                            required={modalMode === "create" && !!field.is_required}
+                            disabled={modalMode === "view"}
                             className="w-full px-3 py-2 border-2 rounded-lg border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                           />
                         )}
@@ -572,13 +755,24 @@ export default function OrganizationPage() {
                   >
                     Закрыть
                   </button>
-                  <button
-                    type="submit"
-                    disabled={submitLoading || formLoading || !!formError || !formId}
-                    className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {submitLoading ? "Отправляем..." : "Зарегистрироваться"}
-                  </button>
+                  {modalMode === "create" ? (
+                    <button
+                      type="submit"
+                      disabled={submitLoading || formLoading || !!formError || !formId}
+                      className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {submitLoading ? "Отправляем..." : "Зарегистрироваться"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleCancelRegistration}
+                      disabled={submitLoading || formLoading}
+                      className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-rose-500 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {submitLoading ? "Отменяем..." : "Отменить регистрацию"}
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
