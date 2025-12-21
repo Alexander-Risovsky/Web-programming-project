@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, buildMediaUrl } from "../config";
 import { dedupFetch } from "../utils/dedupFetch";
@@ -35,6 +37,8 @@ export default function RightSidebar() {
   const [orgEventsLoading, setOrgEventsLoading] = useState(false);
   const [studentEvents, setStudentEvents] = useState([]);
   const [studentEventsLoading, setStudentEventsLoading] = useState(false);
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   useEffect(() => {
     const loadClubs = async () => {
@@ -176,6 +180,33 @@ export default function RightSidebar() {
   const subscribedIds = subscriptions.map((s) => s.club);
   const recommendations = clubs.filter((c) => !subscribedIds.includes(c.id));
 
+  const clubById = useMemo(
+    () => new Map((Array.isArray(clubs) ? clubs : []).map((c) => [c.id, c])),
+    [clubs]
+  );
+
+  const openEventModal = (event) => {
+    setSelectedEvent(event);
+    setEventModalOpen(true);
+  };
+
+  const closeEventModal = () => {
+    setSelectedEvent(null);
+    setEventModalOpen(false);
+  };
+
+  const formatEventDate = (event) => {
+    const raw = event?.published_at || event?.date;
+    if (!raw) return "";
+    if (typeof raw === "string") {
+      const parsed = Date.parse(raw);
+      if (Number.isNaN(parsed)) return raw;
+      return new Date(parsed).toLocaleDateString("ru-RU");
+    }
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("ru-RU");
+  };
+
   const handleSubscribe = async (clubId) => {
     if (!isStudent || !user?.access || loadingSub) return;
     setLoadingSub(true);
@@ -209,6 +240,105 @@ export default function RightSidebar() {
 
   return (
     <aside className="h-full space-y-5">
+      {eventModalOpen &&
+        selectedEvent &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 w-screen h-screen"
+            onClick={closeEventModal}
+          >
+            <div
+              className="relative flex flex-col w-full max-w-lg bg-white shadow-2xl rounded-2xl animate-slide-up overflow-hidden max-h-[calc(100vh-2rem)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 p-5 border-b border-slate-100">
+                <div className="min-w-0">
+                  <h3 className="text-xl font-bold text-slate-900 break-words">
+                    {selectedEvent.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formatEventDate(selectedEvent)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeEventModal}
+                  className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                  aria-label="Закрыть"
+                  title="Закрыть"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex-1 min-h-0 p-5 pt-4 overflow-y-auto">
+              {selectedEvent.club ? (
+                <div className="flex items-center gap-2 mb-3">
+                  <Link
+                    to={`/organization/${selectedEvent.club}`}
+                    className="flex items-center justify-center w-8 h-8 overflow-hidden bg-white border rounded-full border-slate-200 hover:border-primary transition"
+                    aria-label={
+                      selectedEvent.club_name ||
+                      clubById.get(selectedEvent.club)?.name ||
+                      "Организация"
+                    }
+                    title={
+                      selectedEvent.club_name ||
+                      clubById.get(selectedEvent.club)?.name ||
+                      "Организация"
+                    }
+                  >
+                    <img
+                      src={
+                        buildMediaUrl(selectedEvent.club_avatar_url) ||
+                        buildMediaUrl(
+                          clubById.get(selectedEvent.club)?.avatar_url
+                        ) ||
+                        "/OrganizationLogo/DefaultLogo.jpg"
+                      }
+                      alt={
+                        selectedEvent.club_name ||
+                        clubById.get(selectedEvent.club)?.name ||
+                        "Организация"
+                      }
+                      className="object-cover w-full h-full"
+                      loading="lazy"
+                    />
+                  </Link>
+                  <Link
+                    to={`/organization/${selectedEvent.club}`}
+                    className="text-sm font-semibold text-primary hover:underline truncate"
+                  >
+                    {selectedEvent.club_name ||
+                      clubById.get(selectedEvent.club)?.name ||
+                      "Организация"}
+                  </Link>
+                </div>
+              ) : null}
+
+              <p className="mb-4 text-slate-700 whitespace-pre-wrap break-words">
+                {selectedEvent.content || ""}
+              </p>
+
+              {(selectedEvent.image_url || selectedEvent.image || selectedEvent.img) && (
+                <img
+                  src={
+                    buildMediaUrl(selectedEvent.image_url) ||
+                    buildMediaUrl(selectedEvent.image) ||
+                    selectedEvent.img ||
+                    selectedEvent.image_url ||
+                    selectedEvent.image
+                  }
+                  alt={selectedEvent.title}
+                  className="object-cover w-full h-56 rounded-xl"
+                />
+              )}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
       <div className="p-4 glass-card">
         <h3 className="mb-3 font-semibold text-slate-800">
           {isOrg
@@ -225,12 +355,12 @@ export default function RightSidebar() {
               </p>
             ) : (
               orgEvents.map((event, idx) => {
-                const orgId = event.club || user?.orgId || user?.id;
                 return (
-                  <a
+                  <button
+                    type="button"
                     key={event.id}
-                    href={orgId ? `/organization/${orgId}` : "#"}
-                    className="overflow-hidden border shadow-sm bg-white/90 rounded-xl border-slate-200 animate-slide-up hover:shadow-md transition"
+                    onClick={() => openEventModal(event)}
+                    className="overflow-hidden text-left border shadow-sm bg-white/90 rounded-xl border-slate-200 animate-slide-up hover:shadow-md transition"
                     style={{ animationDelay: `${idx * 80}ms` }}
                   >
                     {(event.image_url || event.image) && (
@@ -253,7 +383,7 @@ export default function RightSidebar() {
                         {user?.orgName || user?.name || "Организация"}
                       </p>
                     </div>
-                  </a>
+                  </button>
                 );
               })
             )
@@ -266,10 +396,11 @@ export default function RightSidebar() {
               </p>
             ) : (
               studentEvents.map((event, idx) => (
-                <a
+                <button
+                  type="button"
                   key={event.id}
-                  href={event.club ? `/organization/${event.club}` : "#"}
-                  className="overflow-hidden border shadow-sm bg-white/90 rounded-xl border-slate-200 animate-slide-up hover:shadow-md transition"
+                  onClick={() => openEventModal(event)}
+                  className="overflow-hidden text-left border shadow-sm bg-white/90 rounded-xl border-slate-200 animate-slide-up hover:shadow-md transition"
                   style={{ animationDelay: `${idx * 80}ms` }}
                 >
                   {(event.image_url || event.image) && (
@@ -292,14 +423,16 @@ export default function RightSidebar() {
                       {clubs.find((c) => c.id === event.club)?.name || "Организация"}
                     </p>
                   </div>
-                </a>
+                </button>
               ))
             )
           ) : (
             events.map((event, idx) => (
-              <div
+              <button
+                type="button"
                 key={event.id}
-                className="overflow-hidden border shadow-sm bg-white/90 rounded-xl border-slate-200 animate-slide-up"
+                onClick={() => openEventModal(event)}
+                className="overflow-hidden text-left border shadow-sm bg-white/90 rounded-xl border-slate-200 animate-slide-up"
                 style={{ animationDelay: `${idx * 80}ms` }}
               >
                 <img
@@ -316,7 +449,7 @@ export default function RightSidebar() {
                     {event.date}, {event.time}
                   </p>
                 </div>
-              </div>
+              </button>
             ))
           )}
         </div>

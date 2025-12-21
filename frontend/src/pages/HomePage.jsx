@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import { API_BASE_URL, buildMediaUrl } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { dedupFetch } from "../utils/dedupFetch";
@@ -20,7 +21,10 @@ export default function HomePage() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [registeredPostIds, setRegisteredPostIds] = useState(new Set());
+  const [registrationMetaByPostId, setRegistrationMetaByPostId] = useState(new Map());
   const [registrationsVersion, setRegistrationsVersion] = useState(0);
+  const [modalMode, setModalMode] = useState("create"); // create | view
+  const [viewSubmissionId, setViewSubmissionId] = useState(null);
 
   useEffect(() => {
     const handler = () => setRegistrationsVersion((v) => v + 1);
@@ -61,6 +65,7 @@ export default function HomePage() {
     const loadRegistrations = async () => {
       if (user?.role !== "student" || !authUserId) {
         setRegisteredPostIds(new Set());
+        setRegistrationMetaByPostId(new Map());
         return;
       }
       try {
@@ -74,6 +79,7 @@ export default function HomePage() {
           : [];
         if (userSubs.length === 0) {
           setRegisteredPostIds(new Set());
+          setRegistrationMetaByPostId(new Map());
           return;
         }
 
@@ -82,16 +88,26 @@ export default function HomePage() {
         });
         const forms = await formsRes.json().catch(() => []);
         const formIdSet = new Set(userSubs.map((s) => s.form));
-        const postIds =
-          Array.isArray(forms) && forms.length > 0
-            ? forms
-                .filter((f) => formIdSet.has(f.id) && f.post)
-                .map((f) => f.post)
-            : [];
+
+        const formsById = new Map(
+          (Array.isArray(forms) ? forms : []).map((f) => [f.id, f])
+        );
+        const postIds = [];
+        const meta = new Map();
+        userSubs.forEach((s) => {
+          const form = formsById.get(s.form);
+          if (!form?.post) return;
+          postIds.push(form.post);
+          if (!meta.has(form.post)) {
+            meta.set(form.post, { submissionId: s.id, formId: s.form });
+          }
+        });
 
         setRegisteredPostIds(new Set(postIds));
+        setRegistrationMetaByPostId(meta);
       } catch {
         setRegisteredPostIds(new Set());
+        setRegistrationMetaByPostId(new Map());
       }
     };
     loadRegistrations();
@@ -121,7 +137,7 @@ export default function HomePage() {
       .filter(Boolean);
   };
 
-  const loadFormForPost = async (post) => {
+  const loadFormForPost = async (post, nextMode, submissionId) => {
     if (!post?.id) return;
     setFormLoading(true);
     setFormError("");
@@ -142,24 +158,47 @@ export default function HomePage() {
 
       setFormId(form.id);
 
-      const fieldsRes = await authFetch(
-        `${API_BASE_URL}/api/registration-fields/?form=${form.id}&active=1`,
-        {
-          credentials: "include",
-        }
-      );
-      const fieldsData = await fieldsRes.json().catch(() => null);
-      const fields = Array.isArray(fieldsData)
+      const fieldsPromise = authFetch(
+        `${API_BASE_URL}/api/registration-fields/?form=${form.id}${
+          nextMode === "create" ? "&active=1" : ""
+        }`,
+        { credentials: "include" }
+      )
+        .then((r) => r.json().catch(() => null))
+        .catch(() => null);
+
+      const answersPromise =
+        nextMode === "view" && submissionId
+          ? authFetch(
+              `${API_BASE_URL}/api/registration-answers/?submission=${submissionId}`,
+              { credentials: "include" }
+            )
+              .then((r) => r.json().catch(() => []))
+              .catch(() => [])
+          : Promise.resolve([]);
+
+      const [fieldsData, answersData] = await Promise.all([
+        fieldsPromise,
+        answersPromise,
+      ]);
+
+      const sortedFields = Array.isArray(fieldsData)
         ? fieldsData
-            .filter((f) => f?.is_active !== false)
+            .slice()
             .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
         : [];
+      const fields =
+        nextMode === "create"
+          ? sortedFields.filter((f) => f?.is_active !== false)
+          : sortedFields;
 
       setFormFields(fields);
-      const initialAnswers = {};
-      fields.forEach((f) => {
-        initialAnswers[f.id] = "";
+      const initialAnswers = Object.fromEntries(fields.map((f) => [f.id, ""]));
+
+      (Array.isArray(answersData) ? answersData : []).forEach((ans) => {
+        if (ans?.field) initialAnswers[ans.field] = ans.value_text || "";
       });
+
       setAnswers(initialAnswers);
     } catch (err) {
       setFormError("Не удалось загрузить форму регистрации");
@@ -172,10 +211,22 @@ export default function HomePage() {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  const openModal = (post) => {
+  const openRegisterModal = (post) => {
     setSelectedPost(post);
+    setModalMode("create");
+    setViewSubmissionId(null);
     setModalOpen(true);
-    loadFormForPost(post);
+    loadFormForPost(post, "create", null);
+  };
+
+  const openViewModal = (post) => {
+    const meta = registrationMetaByPostId.get(post.id);
+    const submissionId = meta?.submissionId ?? null;
+    setSelectedPost(post);
+    setModalMode("view");
+    setViewSubmissionId(submissionId);
+    setModalOpen(true);
+    loadFormForPost(post, "view", submissionId);
   };
 
   const closeModal = () => {
@@ -186,10 +237,13 @@ export default function HomePage() {
     setFormId(null);
     setFormError("");
     setSubmitLoading(false);
+    setModalMode("create");
+    setViewSubmissionId(null);
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    if (modalMode !== "create") return;
     if (!selectedPost || !formId || !authUserId) {
       setFormError("Форма недоступна для отправки");
       return;
@@ -244,6 +298,11 @@ export default function HomePage() {
 
       if (selectedPost?.id) {
         setRegisteredPostIds((prev) => new Set([...prev, selectedPost.id]));
+        setRegistrationMetaByPostId((prev) => {
+          const next = new Map(prev);
+          next.set(selectedPost.id, { submissionId, formId });
+          return next;
+        });
         window.dispatchEvent(new Event("registrations-updated"));
       }
 
@@ -260,6 +319,46 @@ export default function HomePage() {
         message: "Не удалось зарегистрироваться на мероприятие",
       });
       setTimeout(() => setToast(null), 3500);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleCancelRegistration = async () => {
+    if (modalMode !== "view" || !selectedPost?.id) return;
+    if (!viewSubmissionId) {
+      setFormError("Не удалось найти вашу заявку");
+      return;
+    }
+    setSubmitLoading(true);
+    setFormError("");
+    try {
+      const res = await authFetch(
+        `${API_BASE_URL}/api/registration-submissions/${viewSubmissionId}/`,
+        { method: "DELETE", credentials: "include" }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.detail || `Ошибка удаления: ${res.status}`);
+      }
+
+      setRegisteredPostIds((prev) => {
+        const next = new Set(prev);
+        next.delete(selectedPost.id);
+        return next;
+      });
+      setRegistrationMetaByPostId((prev) => {
+        const next = new Map(prev);
+        next.delete(selectedPost.id);
+        return next;
+      });
+      window.dispatchEvent(new Event("registrations-updated"));
+
+      closeModal();
+      setToast({ type: "success", message: "Регистрация отменена" });
+      setTimeout(() => setToast(null), 3500);
+    } catch (err) {
+      setFormError(err.message || "Не удалось отменить регистрацию");
     } finally {
       setSubmitLoading(false);
     }
@@ -322,9 +421,32 @@ export default function HomePage() {
                     </span>
                   </div>
 
-                  <p className="mb-1 text-sm font-semibold text-primary">
-                    Организация: {post.club_name || (post.club ?? "-")}
-                  </p>
+                  {post.club ? (
+                    <div className="flex items-center gap-2 mb-2">
+                      <Link
+                        to={`/organization/${post.club}`}
+                        className="flex items-center justify-center w-8 h-8 overflow-hidden bg-white border rounded-full border-slate-200 hover:border-primary transition"
+                        aria-label={post.club_name || "Организация"}
+                        title={post.club_name || "Организация"}
+                      >
+                        <img
+                          src={
+                            buildMediaUrl(post.club_avatar_url) ||
+                            "/OrganizationLogo/DefaultLogo.jpg"
+                          }
+                          alt={post.club_name || "Организация"}
+                          className="object-cover w-full h-full"
+                          loading="lazy"
+                        />
+                      </Link>
+                      <Link
+                        to={`/organization/${post.club}`}
+                        className="text-sm font-semibold text-primary hover:underline"
+                      >
+                        {post.club_name}
+                      </Link>
+                    </div>
+                  ) : null}
 
                   <p className="mb-3 whitespace-pre-wrap text-slate-700">
                     {post.content}
@@ -343,20 +465,25 @@ export default function HomePage() {
                     />
                   )}
 
-                  {(post.type === "event" || post.is_form) &&
-                    user?.role === "student" && (
-                      <div className="flex justify-end mt-3">
-                        {registeredPostIds.has(post.id) ? (
-                          <span className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-emerald-500 shadow-md">
-                            Вы зарегистрированы
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => openModal(post)}
-                            className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all"
-                          >
-                            Зарегистрироваться
-                          </button>
+	                  {(post.type === "event" || post.is_form) &&
+	                    user?.role === "student" && (
+	                      <div className="flex justify-end mt-3">
+	                        {registeredPostIds.has(post.id) ? (
+	                          <button
+	                            type="button"
+	                            onClick={() => openViewModal(post)}
+	                            className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-emerald-500 shadow-md hover:shadow-lg transition-all"
+	                          >
+	                            Вы зарегистрированы
+	                          </button>
+	                        ) : (
+	                          <button
+	                            type="button"
+	                            onClick={() => openRegisterModal(post)}
+	                            className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all"
+	                          >
+	                            Зарегистрироваться
+	                          </button>
                         )}
                       </div>
                     )}
@@ -375,15 +502,24 @@ export default function HomePage() {
               <div
                 className="relative w-full max-w-md p-6 bg-white shadow-2xl rounded-2xl animate-slide-up"
                 onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="mb-2 text-xl font-bold text-slate-900">
-                  Регистрация на мероприятие
-                </h3>
+	              >
+	                <h3 className="mb-2 text-xl font-bold text-slate-900">
+	                  {modalMode === "view"
+	                    ? "Ваша регистрация"
+	                    : "Регистрация на мероприятие"}
+	                </h3>
                 <p className="mb-4 text-sm text-slate-600">
                   {selectedPost.title}
                 </p>
 
-                <form className="space-y-3" onSubmit={handleRegister}>
+	                <form
+	                  className="space-y-3"
+	                  onSubmit={
+	                    modalMode === "create"
+	                      ? handleRegister
+	                      : (e) => e.preventDefault()
+	                  }
+	                >
                   {formLoading ? (
                     <p className="text-sm text-slate-600">
                       Загружаем вопросы формы...
@@ -414,15 +550,16 @@ export default function HomePage() {
                           <label className="text-xs font-semibold text-slate-600">
                             {field.label} {field.is_required ? "*" : ""}
                           </label>
-                          {field.field_type === "select" ? (
-                            <select
-                              value={answers[field.id] ?? ""}
-                              onChange={(e) =>
-                                handleAnswerChange(field.id, e.target.value)
-                              }
-                              required={!!field.is_required}
-                              className="w-full px-3 py-2 bg-white border-2 rounded-lg border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                            >
+	                          {field.field_type === "select" ? (
+	                            <select
+	                              value={answers[field.id] ?? ""}
+	                              onChange={(e) =>
+	                                handleAnswerChange(field.id, e.target.value)
+	                              }
+	                              required={modalMode === "create" && !!field.is_required}
+	                              disabled={modalMode === "view"}
+	                              className="w-full px-3 py-2 bg-white border-2 rounded-lg border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+	                            >
                               <option value="">Выберите вариант</option>
                               {options.map((opt) => (
                                 <option key={opt} value={opt}>
@@ -431,40 +568,52 @@ export default function HomePage() {
                               ))}
                             </select>
                           ) : (
-                            <input
-                              type={inputType}
-                              value={answers[field.id] ?? ""}
-                              onChange={(e) =>
-                                handleAnswerChange(field.id, e.target.value)
-                              }
-                              required={!!field.is_required}
-                              className="w-full px-3 py-2 bg-white border-2 rounded-lg border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                            />
-                          )}
+	                            <input
+	                              type={inputType}
+	                              value={answers[field.id] ?? ""}
+	                              onChange={(e) =>
+	                                handleAnswerChange(field.id, e.target.value)
+	                              }
+	                              required={modalMode === "create" && !!field.is_required}
+	                              disabled={modalMode === "view"}
+	                              className="w-full px-3 py-2 bg-white border-2 rounded-lg border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+	                            />
+	                          )}
                         </div>
                       );
                     })
                   )}
 
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={closeModal}
-                      className="px-4 py-2 text-sm font-semibold transition border text-slate-600 rounded-xl bg-slate-100 border-slate-200 hover:bg-slate-200"
-                    >
-                      Закрыть
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={
-                        submitLoading || formLoading || !!formError || !formId
-                      }
-                      className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {submitLoading ? "Отправляем..." : "Зарегистрироваться"}
-                    </button>
-                  </div>
-                </form>
+	                  <div className="flex justify-end gap-2 pt-2">
+	                    <button
+	                      type="button"
+	                      onClick={closeModal}
+	                      className="px-4 py-2 text-sm font-semibold transition border text-slate-600 rounded-xl bg-slate-100 border-slate-200 hover:bg-slate-200"
+	                    >
+	                      Закрыть
+	                    </button>
+	                    {modalMode === "create" ? (
+	                      <button
+	                        type="submit"
+	                        disabled={
+	                          submitLoading || formLoading || !!formError || !formId
+	                        }
+	                        className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+	                      >
+	                        {submitLoading ? "Отправляем..." : "Зарегистрироваться"}
+	                      </button>
+	                    ) : (
+	                      <button
+	                        type="button"
+	                        onClick={handleCancelRegistration}
+	                        disabled={submitLoading || formLoading}
+	                        className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-rose-500 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+	                      >
+	                        {submitLoading ? "Отменяем..." : "Отменить регистрацию"}
+	                      </button>
+	                    )}
+	                  </div>
+	                </form>
               </div>
             </div>,
             document.body
