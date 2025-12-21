@@ -5,23 +5,36 @@ import { useAuth } from "../../context/AuthContext";
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [toast, setToast] = useState(null); // { type, message }
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { loginStudent } = useAuth();
 
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setToast(null);
+
+    const login = (username || "").trim();
+    const pass = password || "";
+    if (!login || !pass) {
+      showToast("error", "Введите логин/e-mail и пароль.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const result = await loginStudent(username, password);
+      const result = await loginStudent(login, pass);
       if (!result?.success) {
         throw new Error(result?.error || "Не удалось войти. Проверьте данные.");
       }
       navigate("/");
     } catch (err) {
-      setError(err.message || "Не удалось войти. Проверьте данные.");
+      showToast("error", err.message || "Не удалось войти. Проверьте данные.");
     } finally {
       setLoading(false);
     }
@@ -29,6 +42,17 @@ export default function LoginPage() {
 
   return (
     <div className="relative h-screen overflow-hidden flex flex-col">
+      {toast && (
+        <div className="fixed inset-x-0 top-3 z-[50000] flex justify-center pointer-events-none animate-slide-up">
+          <div
+            className={`px-5 py-3 rounded-xl shadow-lg text-white pointer-events-auto ${
+              toast.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
       <div className="absolute inset-0 bg-gradient-to-tl from-[rgba(98,90,228,0.15)] via-[rgba(139,92,246,0.1)] to-[rgba(255,255,255,1)] animate-gradient pointer-events-none" />
       <div className="absolute hidden bg-purple-300 rounded-full pointer-events-none lg:block top-20 right-20 w-72 h-72 mix-blend-multiply filter blur-xl opacity-20 animate-float" />
       <div
@@ -58,7 +82,7 @@ export default function LoginPage() {
           -
         </span>
         <span className="text-sm font-medium text-center sm:text-lg text-slate-600 sm:text-left">
-          Вход в систему HSE Flow. Используйте свой логин и пароль.
+          Вход в систему HSE Flow. Используйте логин или e-mail и пароль.
         </span>
       </header>
 
@@ -77,29 +101,9 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {error && (
-              <div className="p-4 mb-6 text-red-700 border-2 border-red-200 bg-red-50 rounded-xl animate-slide-up">
-                <div className="flex items-center gap-2">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <span>{error}</span>
-                </div>
-              </div>
-            )}
-
             <form
               onSubmit={handleSubmit}
+              noValidate
               className="flex flex-col space-y-4 sm:space-y-5"
             >
               <div className="space-y-2">
@@ -130,12 +134,11 @@ export default function LoginPage() {
                   </div>
                   <input
                     type="text"
-                    placeholder="Введите логин"
+                    placeholder="Введите логин или e-mail"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     disabled={loading}
                     className="w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-3.5 text-base rounded-xl bg-white border-2 border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    required
                   />
                 </div>
               </div>
@@ -167,7 +170,6 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loading}
                     className="w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-3.5 text-base rounded-xl bg-white border-2 border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    required
                   />
                 </div>
               </div>

@@ -10,21 +10,46 @@ export default function RegisterPage() {
     password: "",
   });
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null); // { type, message }
   const navigate = useNavigate();
 
   const handleChange = (field) => (e) =>
     setForm({ ...form, [field]: e.target.value });
 
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setToast(null);
+
+    const firstName = form.firstName.trim();
+    const lastName = form.lastName.trim();
+    const username = form.username.trim();
+    const email = form.email.trim();
+    const password = form.password;
+
+    if (!firstName || !lastName || !username || !email || !password) {
+      showToast("error", "Заполните все обязательные поля.");
+      return;
+    }
+
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!emailOk) {
+      showToast("error", "Введите корректный e-mail.");
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = {
-        username: form.username.trim(),
-        email: form.email.trim(),
-        password: form.password,
-        student_name: form.firstName.trim(),
-        student_surname: form.lastName.trim(),
+        username,
+        email,
+        password,
+        student_name: firstName,
+        student_surname: lastName,
       };
 
       const res = await fetch(`${API_BASE_URL}/api/auth/register/`, {
@@ -38,14 +63,19 @@ export default function RegisterPage() {
       const data = isJson ? await res.json() : null;
 
       if (!res.ok) {
-        throw new Error(
-          data?.detail || data?.error || "Не удалось зарегистрироваться"
-        );
+        const message =
+          data?.detail ||
+          data?.error ||
+          data?.username?.[0] ||
+          data?.email?.[0] ||
+          data?.password?.[0] ||
+          "Не удалось зарегистрироваться";
+        throw new Error(message);
       }
 
       navigate("/login");
     } catch (err) {
-      alert(err.message || "Ошибка регистрации");
+      showToast("error", err.message || "Ошибка регистрации");
     } finally {
       setLoading(false);
     }
@@ -53,6 +83,17 @@ export default function RegisterPage() {
 
   return (
     <div className="relative h-screen overflow-hidden flex flex-col">
+      {toast && (
+        <div className="fixed inset-x-0 top-3 z-[50000] flex justify-center pointer-events-none animate-slide-up">
+          <div
+            className={`px-5 py-3 rounded-xl shadow-lg text-white pointer-events-auto ${
+              toast.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
       <div className="absolute inset-0 bg-gradient-to-tl from-[rgba(98,90,228,0.15)] via-[rgba(139,92,246,0.1)] to-[rgba(255,255,255,1)] animate-gradient pointer-events-none" />
       <div className="absolute hidden bg-purple-300 rounded-full pointer-events-none lg:block top-20 right-20 w-72 h-72 mix-blend-multiply filter blur-xl opacity-20 animate-float" />
       <div
@@ -103,6 +144,7 @@ export default function RegisterPage() {
 
             <form
               onSubmit={handleSubmit}
+              noValidate
               className="flex flex-col space-y-4 sm:space-y-5"
             >
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
@@ -116,7 +158,6 @@ export default function RegisterPage() {
                     onChange={handleChange("firstName")}
                     placeholder="Имя"
                     className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -129,7 +170,6 @@ export default function RegisterPage() {
                     onChange={handleChange("lastName")}
                     placeholder="Фамилия"
                     className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                    required
                   />
                 </div>
               </div>
@@ -145,7 +185,6 @@ export default function RegisterPage() {
                     onChange={handleChange("username")}
                     placeholder="Введите логин"
                     className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -158,7 +197,6 @@ export default function RegisterPage() {
                     onChange={handleChange("password")}
                     placeholder="Введите пароль"
                     className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                    required
                   />
                 </div>
               </div>
@@ -173,7 +211,6 @@ export default function RegisterPage() {
                   onChange={handleChange("email")}
                   placeholder="Введите e-mail"
                   className="w-full px-4 py-3 transition-all duration-300 bg-white border-2 shadow-sm rounded-xl border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:shadow-md"
-                  required
                 />
               </div>
 

@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from rest_framework import serializers
 
 from web.models import Club
@@ -8,9 +9,35 @@ from .models import Student
 
 User = get_user_model()
 
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024  # 2MB
+
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True)
+    username = serializers.CharField(
+        required=True,
+        validators=[],
+        error_messages={
+            "required": "Логин обязателен.",
+            "blank": "Логин обязателен.",
+        },
+    )
+    email = serializers.EmailField(
+        required=True,
+        validators=[],
+        error_messages={
+            "required": "E-mail обязателен.",
+            "blank": "E-mail обязателен.",
+            "invalid": "Введите корректный e-mail.",
+        },
+    )
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        error_messages={
+            "required": "Пароль обязателен.",
+            "blank": "Пароль обязателен.",
+        },
+    )
     student_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     student_surname = serializers.CharField(write_only=True, required=False, allow_blank=True)
     course = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -21,15 +48,36 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ("id", "username", "email", "password", "student_name", "student_surname", "course", "group", "major")
 
+    def validate_username(self, value: str):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Логин обязателен.")
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("Этот логин уже занят.")
+        return value
+
+    def validate_email(self, value: str):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("E-mail обязателен.")
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Этот e-mail уже используется.")
+        return value
+
     def create(self, validated_data):
         student_name = validated_data.pop("student_name", None)
         student_surname = validated_data.pop("student_surname", None)
 
-        user = User.objects.create_user(
-            username=validated_data["username"],
-            email=validated_data.get("email"),
-            password=validated_data["password"],
-        )
+        try:
+            user = User.objects.create_user(
+                username=validated_data["username"],
+                email=validated_data.get("email"),
+                password=validated_data["password"],
+            )
+        except IntegrityError as exc:
+            raise serializers.ValidationError(
+                {"detail": "Этот логин или e-mail уже используются."}
+            ) from exc
 
         if student_name or student_surname:
             Student.objects.create(
@@ -40,19 +88,65 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class RegisterClubSerializer(serializers.Serializer):
-    username = serializers.CharField(required=True)
-    email = serializers.EmailField(required=False, allow_blank=True)
-    password = serializers.CharField(write_only=True, required=True)
-    name = serializers.CharField(required=True)
+    username = serializers.CharField(
+        required=True,
+        error_messages={
+            "required": "Логин обязателен.",
+            "blank": "Логин обязателен.",
+        },
+    )
+    email = serializers.EmailField(
+        required=False,
+        allow_blank=True,
+        error_messages={
+            "invalid": "Введите корректный e-mail.",
+        },
+    )
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        error_messages={
+            "required": "Пароль обязателен.",
+            "blank": "Пароль обязателен.",
+        },
+    )
+    name = serializers.CharField(
+        required=True,
+        error_messages={
+            "required": "Название организации обязательно.",
+            "blank": "Название организации обязательно.",
+        },
+    )
     description = serializers.CharField(required=False, allow_blank=True)
     avatar_url = serializers.CharField(required=False, allow_blank=True)
 
+    def validate_username(self, value: str):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Логин обязателен.")
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("Этот логин уже занят.")
+        return value
+
+    def validate_email(self, value: str):
+        value = (value or "").strip()
+        if not value:
+            return value
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Этот e-mail уже используется.")
+        return value
+
     def create(self, validated_data):
-        user = User.objects.create_user(
-            username=validated_data["username"],
-            email=validated_data.get("email"),
-            password=validated_data["password"],
-        )
+        try:
+            user = User.objects.create_user(
+                username=validated_data["username"],
+                email=validated_data.get("email"),
+                password=validated_data["password"],
+            )
+        except IntegrityError as exc:
+            raise serializers.ValidationError(
+                {"detail": "Этот логин или e-mail уже используются."}
+            ) from exc
 
         club = Club.objects.create(
             user=user,
@@ -81,6 +175,11 @@ class StudentSerializer(serializers.ModelSerializer):
             return url
         return None
 
+    def validate_avatar_file(self, value):
+        if value and getattr(value, "size", 0) > MAX_UPLOAD_BYTES:
+            raise serializers.ValidationError("Файл слишком большой. Максимальный размер — 2 МБ.")
+        return value
+
 
 class UserSerializer(serializers.ModelSerializer):
     student_profile = StudentSerializer(read_only=True)
@@ -104,6 +203,11 @@ class ClubSerializer(serializers.ModelSerializer):
             url = obj.avatar_url.url
             return url
         return None
+
+    def validate_avatar_file(self, value):
+        if value and getattr(value, "size", 0) > MAX_UPLOAD_BYTES:
+            raise serializers.ValidationError("Файл слишком большой. Максимальный размер — 2 МБ.")
+        return value
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(required=True)

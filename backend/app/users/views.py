@@ -175,7 +175,10 @@ class LoginStudentView(APIView):
 
         user = _authenticate_by_login_or_email(request, username, password)
         if user is None:
-            return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"detail": "Неверный логин/e-mail или пароль."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         refresh = RefreshToken.for_user(user)
         student = user.student_profile
@@ -225,7 +228,10 @@ class LoginClubView(APIView):
 
         user = _authenticate_by_login_or_email(request, username, password)
         if user is None:
-            return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"detail": "Неверный логин/e-mail или пароль."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         refresh = RefreshToken.for_user(user)
         club = user.club_profile

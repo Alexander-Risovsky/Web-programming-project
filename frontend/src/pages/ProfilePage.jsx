@@ -10,6 +10,7 @@ export default function ProfilePage() {
   const isOrg =
     user?.role === "org" || (!!user?.orgId && !user?.studentProfile);
   const authUserId = user?.role === "student" ? (user?.userId ?? user?.id) : user?.id;
+  const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 
   const [orgInfo, setOrgInfo] = useState(null);
   const [orgPostsRemote, setOrgPostsRemote] = useState([]);
@@ -785,7 +786,12 @@ export default function ProfilePage() {
 
       const updated = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(updated?.detail || "Не удалось обновить пост");
+        const message =
+          updated?.detail ||
+          updated?.image_file?.[0] ||
+          updated?.image?.[0] ||
+          "Не удалось обновить пост";
+        throw new Error(message);
       }
 
       setOrgPostsRemote((prev) =>
@@ -986,7 +992,12 @@ export default function ProfilePage() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(data?.detail || "Не удалось обновить профиль");
+        const message =
+          data?.detail ||
+          data?.avatar_file?.[0] ||
+          data?.avatar_url?.[0] ||
+          "Не удалось обновить профиль";
+        throw new Error(message);
       }
 
       // обновляем user в контексте
@@ -1044,9 +1055,12 @@ export default function ProfilePage() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(
-          data?.detail || "Не удалось обновить профиль организации"
-        );
+        const message =
+          data?.detail ||
+          data?.avatar_file?.[0] ||
+          data?.avatar_url?.[0] ||
+          "Не удалось обновить профиль организации";
+        throw new Error(message);
       }
 
       setOrgInfo(data || payload);
@@ -1560,6 +1574,15 @@ export default function ProfilePage() {
                       e.target.value = "";
                       return;
                     }
+                    if (file.size > MAX_UPLOAD_BYTES) {
+                      setToast({
+                        type: "error",
+                        message: "Файл слишком большой. Максимальный размер — 2 МБ.",
+                      });
+                      setTimeout(() => setToast(null), 4000);
+                      e.target.value = "";
+                      return;
+                    }
                     setOrgAvatarFile(file);
                   }}
                 />
@@ -1681,6 +1704,15 @@ export default function ProfilePage() {
                       setToast({
                         type: "error",
                         message: "Please select an image file.",
+                      });
+                      setTimeout(() => setToast(null), 4000);
+                      e.target.value = "";
+                      return;
+                    }
+                    if (file.size > MAX_UPLOAD_BYTES) {
+                      setToast({
+                        type: "error",
+                        message: "Файл слишком большой. Максимальный размер — 2 МБ.",
                       });
                       setTimeout(() => setToast(null), 4000);
                       e.target.value = "";
@@ -1934,6 +1966,16 @@ export default function ProfilePage() {
                               type: "error",
                               message:
                                 "Выбери изображение (png/jpg/webp и т.п.)",
+                            });
+                            setTimeout(() => setToast(null), 3500);
+                            e.target.value = "";
+                            return;
+                          }
+                          if (file.size > MAX_UPLOAD_BYTES) {
+                            setToast({
+                              type: "error",
+                              message:
+                                "Файл слишком большой. Максимальный размер — 2 МБ.",
                             });
                             setTimeout(() => setToast(null), 3500);
                             e.target.value = "";
