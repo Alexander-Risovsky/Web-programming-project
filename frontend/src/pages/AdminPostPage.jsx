@@ -6,6 +6,7 @@ import { API_BASE_URL } from "../config";
 export default function AdminPostPage() {
   const { user, authFetch } = useAuth();
   const isOrg = user?.role === "org";
+  const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 
   const [type, setType] = useState("info"); // info | event
   const [title, setTitle] = useState("");
@@ -66,7 +67,12 @@ export default function AdminPostPage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data?.detail || "Не удалось создать пост");
+        const message =
+          data?.detail ||
+          data?.image_file?.[0] ||
+          data?.image?.[0] ||
+          "Не удалось создать пост";
+        throw new Error(message);
       }
 
       if (type === "event" && formFields.length > 0 && data?.id) {
@@ -272,6 +278,11 @@ export default function AdminPostPage() {
                   if (!file) return;
                   if (!file.type?.startsWith("image/")) {
                     showToast("error", "Выбери изображение (png/jpg/webp и т.п.)");
+                    e.target.value = "";
+                    return;
+                  }
+                  if (file.size > MAX_UPLOAD_BYTES) {
+                    showToast("error", "Файл слишком большой. Максимальный размер — 2 МБ.");
                     e.target.value = "";
                     return;
                   }

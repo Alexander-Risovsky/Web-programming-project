@@ -339,8 +339,47 @@ export default function OrganizationPage() {
       );
       const submissionData = await submissionRes.json().catch(() => null);
       if (!submissionRes.ok) {
+        const message =
+          submissionData?.detail ||
+          submissionData?.non_field_errors?.[0] ||
+          "Не удалось отправить заявку";
+
+        if (message.toLowerCase().includes("уже зарегистр")) {
+          try {
+            const existingRes = await authFetch(
+              `${API_BASE_URL}/api/registration-submissions/?user=${authUserId}&form=${formId}`,
+              { credentials: "include" }
+            );
+            const existing = await existingRes.json().catch(() => []);
+            const existingSub = Array.isArray(existing) ? existing[0] : null;
+            const submissionId = existingSub?.id;
+            if (submissionId) {
+              setRegisteredPostIds((prev) => new Set([...prev, selectedPost.id]));
+              setRegistrationMetaByPostId((prev) => {
+                const next = new Map(prev);
+                next.set(selectedPost.id, { submissionId, formId });
+                return next;
+              });
+              window.dispatchEvent(new Event("registrations-updated"));
+
+              setToast({
+                type: "info",
+                message: "Вы уже зарегистрированы. Открываем вашу заявку.",
+              });
+              setTimeout(() => setToast(null), 3500);
+
+              setModalMode("view");
+              setViewSubmissionId(submissionId);
+              setModalOpen(true);
+              await loadFormForPost(selectedPost.id, "view", submissionId);
+              return;
+            }
+          } catch {
+            // fall through to default error handling
+          }
+        }
         throw new Error(
-          submissionData?.detail || "Не удалось отправить заявку"
+          message
         );
       }
 
@@ -383,7 +422,7 @@ export default function OrganizationPage() {
       setFormError(err.message || "Не удалось отправить заявку");
       setToast({
         type: "error",
-        message: "Не удалось подписаться на организацию",
+        message: err.message || "Не удалось отправить заявку",
       });
       setTimeout(() => setToast(null), 3500);
     } finally {
@@ -537,7 +576,11 @@ export default function OrganizationPage() {
           <div className="fixed inset-x-0 top-3 z-[12000] flex justify-center pointer-events-none animate-slide-up">
             <div
               className={`px-5 py-3 rounded-xl shadow-lg text-white pointer-events-auto ${
-                toast.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+                toast.type === "success"
+                  ? "bg-emerald-500"
+                  : toast.type === "info"
+                  ? "bg-violet-600"
+                  : "bg-rose-500"
               }`}
             >
               {toast.message}

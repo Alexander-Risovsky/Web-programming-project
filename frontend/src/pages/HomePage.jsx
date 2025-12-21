@@ -11,6 +11,8 @@ export default function HomePage() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [formFields, setFormFields] = useState([]);
@@ -34,12 +36,53 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    const trimmed = searchQuery.trim();
+    const timer = setTimeout(() => setDebouncedQuery(trimmed), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const highlightRegex = useMemo(() => {
+    const q = (debouncedQuery || "").trim();
+    if (!q) return null;
+
+    const escapeRegExp = (value) =>
+      value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const tokens = q
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .slice(0, 6)
+      .sort((a, b) => b.length - a.length)
+      .map(escapeRegExp);
+
+    if (tokens.length === 0) return null;
+    return new RegExp(`(${tokens.join("|")})`, "gi");
+  }, [debouncedQuery]);
+
+  const highlightText = (text) => {
+    if (!highlightRegex || !text) return text;
+    const parts = String(text).split(highlightRegex);
+    return parts.map((part, idx) =>
+      idx % 2 === 1 ? (
+        <span key={idx} className="font-semibold text-purple-600">
+          {part}
+        </span>
+      ) : (
+        <React.Fragment key={idx}>{part}</React.Fragment>
+      )
+    );
+  };
+
+  useEffect(() => {
     const loadPosts = async () => {
       setLoading(true);
       setError("");
       try {
         // В dev проксируется через vite.config.js на бекенд http://localhost:8000
-        const res = await dedupFetch(`${API_BASE_URL}/api/posts/`);
+        const url = new URL(`${API_BASE_URL}/api/posts/`);
+        if (debouncedQuery) url.searchParams.set("q", debouncedQuery);
+        const res = await dedupFetch(url.toString());
         if (!res.ok) {
           throw new Error(`Ошибка загрузки: ${res.status}`);
         }
@@ -59,7 +102,7 @@ export default function HomePage() {
     };
 
     loadPosts();
-  }, []);
+  }, [debouncedQuery]);
 
   useEffect(() => {
     const loadRegistrations = async () => {
@@ -113,15 +156,15 @@ export default function HomePage() {
     loadRegistrations();
   }, [user?.role, user?.access, authUserId, registrationsVersion, authFetch]);
 
-  const feed = useMemo(
-    () =>
-      [...posts].sort(
-        (a, b) =>
-          new Date(b.published_at || b.date || 0).getTime() -
-          new Date(a.published_at || a.date || 0).getTime()
-      ),
-    [posts]
-  );
+  const feed = useMemo(() => {
+    const isSearching = debouncedQuery.length > 0;
+    if (isSearching) return Array.isArray(posts) ? posts : [];
+    return [...posts].sort(
+      (a, b) =>
+        new Date(b.published_at || b.date || 0).getTime() -
+        new Date(a.published_at || a.date || 0).getTime()
+    );
+  }, [posts, debouncedQuery]);
 
   const getFieldOptions = (field) => {
     if (!field?.options) return [];
@@ -266,8 +309,46 @@ export default function HomePage() {
       );
       const submissionData = await submissionRes.json().catch(() => null);
       if (!submissionRes.ok) {
+        const message =
+          submissionData?.detail ||
+          submissionData?.non_field_errors?.[0] ||
+          "Не удалось отправить заявку";
+
+        if (message.toLowerCase().includes("уже зарегистр")) {
+          try {
+            const existingRes = await authFetch(
+              `${API_BASE_URL}/api/registration-submissions/?user=${authUserId}&form=${formId}`,
+              { credentials: "include" }
+            );
+            const existing = await existingRes.json().catch(() => []);
+            const existingSub = Array.isArray(existing) ? existing[0] : null;
+            const submissionId = existingSub?.id;
+            if (submissionId) {
+              setRegisteredPostIds((prev) => new Set([...prev, selectedPost.id]));
+              setRegistrationMetaByPostId((prev) => {
+                const next = new Map(prev);
+                next.set(selectedPost.id, { submissionId, formId });
+                return next;
+              });
+              window.dispatchEvent(new Event("registrations-updated"));
+
+              setToast({
+                type: "info",
+                message: "Вы уже зарегистрированы. Открываем вашу заявку.",
+              });
+              setTimeout(() => setToast(null), 3500);
+
+              setModalMode("view");
+              setViewSubmissionId(submissionId);
+              await loadFormForPost(selectedPost, "view", submissionId);
+              return;
+            }
+          } catch {
+            // fall through to default error handling
+          }
+        }
         throw new Error(
-          submissionData?.detail || "Не удалось отправить заявку"
+          message
         );
       }
 
@@ -316,7 +397,7 @@ export default function HomePage() {
       setFormError(err.message || "Не удалось отправить заявку");
       setToast({
         type: "error",
-        message: "Не удалось зарегистрироваться на мероприятие",
+        message: err.message || "Не удалось зарегистрироваться на мероприятие",
       });
       setTimeout(() => setToast(null), 3500);
     } finally {
@@ -368,10 +449,14 @@ export default function HomePage() {
     <>
       {toast &&
         createPortal(
-          <div className="fixed inset-x-0 top-3 z-[12000] flex justify-center pointer-events-none animate-slide-up">
+            <div className="fixed inset-x-0 top-3 z-[12000] flex justify-center pointer-events-none animate-slide-up">
             <div
               className={`px-5 py-3 rounded-xl shadow-lg text-white pointer-events-auto ${
-                toast.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+                toast.type === "success"
+                  ? "bg-emerald-500"
+                  : toast.type === "info"
+                  ? "bg-violet-600"
+                  : "bg-rose-500"
               }`}
             >
               {toast.message}
@@ -390,6 +475,34 @@ export default function HomePage() {
           </p>
         </div>
 
+        <div className="flex justify-center">
+          <div className="w-full max-w-xl">
+            <div className="relative">
+              <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-5 h-5"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </div>
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск по постам..."
+                className="w-full py-3 pl-4 pr-12 bg-white border-2 rounded-2xl border-slate-200 text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+          </div>
+        </div>
+
         {loading ? (
           <div className="p-5 border rounded-xl bg-slate-50 text-slate-600">
             Загружаем посты...
@@ -400,7 +513,7 @@ export default function HomePage() {
           </div>
         ) : feed.length === 0 ? (
           <div className="p-5 border rounded-xl bg-slate-50 text-slate-600">
-            Постов пока нет.
+            {debouncedQuery ? "Ничего не найдено." : "Постов пока нет."}
           </div>
         ) : (
           <div className="space-y-4">
@@ -414,7 +527,7 @@ export default function HomePage() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-xl font-semibold text-slate-900">
-                      {post.title}
+                      {highlightText(post.title)}
                     </h2>
                     <span className="text-xs text-slate-500">
                       {date ? new Date(date).toLocaleDateString("ru-RU") : ""}
@@ -449,7 +562,7 @@ export default function HomePage() {
                   ) : null}
 
                   <p className="mb-3 whitespace-pre-wrap text-slate-700">
-                    {post.content}
+                    {highlightText(post.content)}
                   </p>
 
                   {(post.image_url || post.image) && (
