@@ -1,15 +1,45 @@
-import React, { useMemo } from "react";
-import { organizations, posts } from "../data/mockOrgsAndPosts";
+import React, { useEffect, useState } from "react";
+import { API_BASE_URL } from "../config";
+import { useAuth } from "../context/AuthContext";
 
 export default function WelcomePage() {
-  const stats = useMemo(() => {
-    return {
-      orgs: organizations.length,
-      posts: posts.length,
-      events: posts.length + 3,
-      users: 1280,
+  const { authFetch } = useAuth();
+  const [stats, setStats] = useState({
+    orgs: null,
+    posts: null,
+    events: null,
+    users: null,
+  });
+
+  useEffect(() => {
+    let alive = true;
+
+    const load = async () => {
+      try {
+        const res = await authFetch(`${API_BASE_URL}/api/stats/`, {
+          credentials: "include",
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data) throw new Error();
+
+        if (!alive) return;
+        setStats({
+          orgs: typeof data?.clubs === "number" ? data.clubs : null,
+          posts: typeof data?.posts === "number" ? data.posts : null,
+          events: typeof data?.events === "number" ? data.events : null,
+          users: typeof data?.users === "number" ? data.users : null,
+        });
+      } catch {
+        if (!alive) return;
+        setStats({ orgs: null, posts: null, events: null, users: null });
+      }
     };
-  }, []);
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, [authFetch]);
 
   return (
     <section className="max-w-7xl mx-auto space-y-6 lg:space-y-8">
@@ -97,28 +127,28 @@ export default function WelcomePage() {
           {[
             {
               label: "Сообщества",
-              value: stats.orgs,
+              value: stats.orgs ?? "—",
               color: "from-blue-600 to-indigo-600",
               border: "border-blue-200/50 hover:shadow-blue-200/50 hover:border-blue-400",
               bg: "from-blue-50/50 to-transparent",
             },
             {
               label: "Посты",
-              value: stats.posts,
+              value: stats.posts ?? "—",
               color: "from-green-600 to-emerald-600",
               border: "border-green-200/50 hover:shadow-green-200/50 hover:border-green-400",
               bg: "from-green-50/50 to-transparent",
             },
             {
               label: "События",
-              value: stats.events,
+              value: stats.events ?? "—",
               color: "from-purple-600 to-indigo-600",
               border: "border-purple-200/50 hover:shadow-purple-200/50 hover:border-purple-400",
               bg: "from-purple-50/50 to-transparent",
             },
             {
               label: "Пользователи",
-              value: stats.users,
+              value: stats.users ?? "—",
               color: "from-indigo-600 to-blue-600",
               border: "border-indigo-200/50 hover:shadow-indigo-200/50 hover:border-indigo-400",
               bg: "from-indigo-50/50 to-transparent",

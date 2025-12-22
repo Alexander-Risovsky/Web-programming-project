@@ -7,6 +7,7 @@ try:
     from web.views_debug import StorageDebugView
 except Exception:
     StorageDebugView = None
+from web.views_stats import PlatformStatsView
 from web.views import (
     FormViewSet,
     NotificationViewSet,
@@ -34,5 +35,6 @@ router.register(r"notifications", NotificationViewSet, basename="notification")
 
 urlpatterns = [
     *( [path("debug/storage/", StorageDebugView.as_view())] if StorageDebugView else [] ),
+    path("stats/", PlatformStatsView.as_view()),
     path("", include(router.urls)),
 ]

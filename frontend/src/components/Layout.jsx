@@ -10,8 +10,10 @@ export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
+  const mainRef = useRef(null);
   const { user, isOrg, logout, authFetch } = useAuth();
   const [notifications, setNotifications] = useState([]);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const loadNotifications = async () => {
     if (!user?.access) {
@@ -66,6 +68,45 @@ export default function Layout() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const node = mainRef.current;
+
+    let rafId = null;
+    const readScrollTop = () => {
+      const mainTop = node?.scrollTop || 0;
+      const winTop =
+        window.scrollY ||
+        document.documentElement?.scrollTop ||
+        document.body?.scrollTop ||
+        0;
+      return Math.max(mainTop, winTop);
+    };
+
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        setShowScrollTop(readScrollTop() > 320);
+      });
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    if (node) node.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener("scroll", onScroll);
+      if (node) node.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  const scrollToTop = () => {
+    const node = mainRef.current;
+    if (node) node.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <div className="flex min-h-screen text-slate-900 bg-slate-50">
@@ -249,7 +290,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="relative flex-1 overflow-y-auto">
+        <main ref={mainRef} className="relative flex-1 overflow-y-auto">
           <div className="relative flex gap-6 px-4 py-6 lg:px-6">
             <div className="flex-1">
               <Outlet />
@@ -259,6 +300,32 @@ export default function Layout() {
             </div>
           </div>
         </main>
+
+        <button
+          type="button"
+          onClick={scrollToTop}
+          aria-label="Наверх"
+          title="Наверх"
+          className={`fixed bottom-6 right-6 z-[90000] flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-indigo-600/70 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:bg-indigo-600/90 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
+            showScrollTop
+              ? "opacity-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 translate-y-2 pointer-events-none"
+          }`}
+        >
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 15l7-7 7 7"
+            />
+          </svg>
+        </button>
       </div>
     </div>
   );
