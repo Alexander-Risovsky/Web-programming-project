@@ -2,6 +2,8 @@
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { API_BASE_URL, buildMediaUrl } from "../config";
+import PostDetailsModal from "../components/PostDetailsModal";
+import ImagePreviewModal from "../components/ImagePreviewModal";
 import { useAuth } from "../context/AuthContext";
 import { dedupFetch } from "../utils/dedupFetch";
 
@@ -15,6 +17,10 @@ export default function HomePage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
+  const [postDetailsOpen, setPostDetailsOpen] = useState(false);
+  const [postDetailsPost, setPostDetailsPost] = useState(null);
+  const [imagePreviewSrc, setImagePreviewSrc] = useState(null);
+  const [imagePreviewAlt, setImagePreviewAlt] = useState("");
   const [formFields, setFormFields] = useState([]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
@@ -254,6 +260,27 @@ export default function HomePage() {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
   };
 
+  const openPostDetails = (post) => {
+    setPostDetailsPost(post);
+    setPostDetailsOpen(true);
+  };
+
+  const closePostDetails = () => {
+    setPostDetailsPost(null);
+    setPostDetailsOpen(false);
+  };
+
+  const openImagePreview = (src, alt) => {
+    if (!src) return;
+    setImagePreviewSrc(src);
+    setImagePreviewAlt(alt || "");
+  };
+
+  const closeImagePreview = () => {
+    setImagePreviewSrc(null);
+    setImagePreviewAlt("");
+  };
+
   const openRegisterModal = (post) => {
     setSelectedPost(post);
     setModalMode("create");
@@ -447,9 +474,9 @@ export default function HomePage() {
 
   return (
     <>
-      {toast &&
-        createPortal(
-            <div className="fixed inset-x-0 top-3 z-[12000] flex justify-center pointer-events-none animate-slide-up">
+       {toast &&
+         createPortal(
+             <div className="fixed inset-x-0 top-3 z-[12000] flex justify-center pointer-events-none animate-slide-up">
             <div
               className={`px-5 py-3 rounded-xl shadow-lg text-white pointer-events-auto ${
                 toast.type === "success"
@@ -462,8 +489,20 @@ export default function HomePage() {
               {toast.message}
             </div>
           </div>,
-          document.body
-        )}
+           document.body
+         )}
+
+      {postDetailsOpen && postDetailsPost ? (
+        <PostDetailsModal post={postDetailsPost} onClose={closePostDetails} />
+      ) : null}
+
+      {imagePreviewSrc ? (
+        <ImagePreviewModal
+          src={imagePreviewSrc}
+          alt={imagePreviewAlt}
+          onClose={closeImagePreview}
+        />
+      ) : null}
 
       <section className="max-w-5xl mx-auto space-y-5">
         <div className="text-center">
@@ -561,21 +600,46 @@ export default function HomePage() {
                     </div>
                   ) : null}
 
-                  <p className="mb-3 whitespace-pre-wrap text-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => openPostDetails(post)}
+                    className="mb-3 w-full text-left whitespace-pre-wrap text-slate-700 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/40 rounded-lg"
+                    title="Открыть пост"
+                  >
                     {highlightText(post.content)}
-                  </p>
+                  </button>
 
-                  {(post.image_url || post.image) && (
-                    <img
-                      src={
-                        buildMediaUrl(post.image_url) ||
-                        buildMediaUrl(post.image) ||
-                        post.image_url ||
-                        post.image
+                  {(post.image_url || post.image || post.img) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openImagePreview(
+                          buildMediaUrl(post.image_url) ||
+                            buildMediaUrl(post.image) ||
+                            buildMediaUrl(post.img) ||
+                            post.img ||
+                            post.image_url ||
+                            post.image,
+                          post.title
+                        )
                       }
-                      alt={post.title}
-                      className="object-cover w-full mb-3 h-60 rounded-xl"
-                    />
+                      className="block w-full mb-3"
+                      title="Открыть картинку"
+                    >
+                      <img
+                        src={
+                          buildMediaUrl(post.image_url) ||
+                          buildMediaUrl(post.image) ||
+                          buildMediaUrl(post.img) ||
+                          post.img ||
+                          post.image_url ||
+                          post.image
+                        }
+                        alt={post.title}
+                        className="object-cover w-full h-60 rounded-xl cursor-zoom-in"
+                        loading="lazy"
+                      />
+                    </button>
                   )}
 
 	                  {(post.type === "event" || post.is_form) &&

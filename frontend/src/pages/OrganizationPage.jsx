@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, buildMediaUrl } from "../config";
+import PostDetailsModal from "../components/PostDetailsModal";
 export default function OrganizationPage() {
   const { orgId } = useParams();
   const { user, authFetch } = useAuth();
@@ -17,6 +18,8 @@ export default function OrganizationPage() {
   const [subscriptionId, setSubscriptionId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
+  const [postDetailsOpen, setPostDetailsOpen] = useState(false);
+  const [postDetailsPost, setPostDetailsPost] = useState(null);
   const [notifyOn, setNotifyOn] = useState(false);
   const [notifySaving, setNotifySaving] = useState(false);
   const [formFields, setFormFields] = useState([]);
@@ -269,6 +272,16 @@ export default function OrganizationPage() {
 
   const handleAnswerChange = (fieldId, value) => {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
+  };
+
+  const openPostDetails = (post) => {
+    setPostDetailsPost(post);
+    setPostDetailsOpen(true);
+  };
+
+  const closePostDetails = () => {
+    setPostDetailsPost(null);
+    setPostDetailsOpen(false);
   };
 
   const openRegisterModal = (post) => {
@@ -586,8 +599,16 @@ export default function OrganizationPage() {
               {toast.message}
             </div>
           </div>,
-          document.body
-        )}
+           document.body
+         )}
+
+      {postDetailsOpen && postDetailsPost ? (
+        <PostDetailsModal
+          post={postDetailsPost}
+          club={club}
+          onClose={closePostDetails}
+        />
+      ) : null}
 
       <section className="max-w-5xl mx-auto space-y-5">
       <div className="flex flex-col items-center gap-5 p-6 glass-card lg:p-8 sm:flex-row sm:items-start">
@@ -655,9 +676,14 @@ export default function OrganizationPage() {
                   )}
                 </span>
               </div>
-              <p className="mb-3 text-slate-700 whitespace-pre-wrap break-words">
+              <button
+                type="button"
+                onClick={() => openPostDetails(post)}
+                className="mb-3 w-full text-left text-slate-700 whitespace-pre-wrap break-words hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/40 rounded-lg"
+                title="Открыть пост"
+              >
                 {post.content}
-              </p>
+              </button>
               {(post.image_url || post.image) && (
                 <img
                   src={
